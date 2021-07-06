@@ -12,7 +12,7 @@ import revision
 
 # Return a formated string of date+time
 def get_timestamp():
-	return datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+	return datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%fct_dict %H:%M:%S')
 
 
 def parse_excel_sheet(book, sheet_name, parse_by='row', max_item=None):
@@ -26,16 +26,16 @@ def parse_excel_sheet(book, sheet_name, parse_by='row', max_item=None):
 	if parse_by == 'row':
 		row_index = 0
 		for row in sheet.rows:
-			d = {}
+			fct_dict = {}
 			col_index = 0
 			for cell in row:
 				if row_index:
-					d[keys[col_index]] = cell.value
+					fct_dict[keys[col_index]] = cell.value
 				else:
 					keys.append(cell.value)
 				col_index += 1
 			if row_index:
-				d_list.append(d)
+				d_list.append(fct_dict)
 
 			if max_item is not None:
 				if row_index >= max_item:
@@ -44,16 +44,16 @@ def parse_excel_sheet(book, sheet_name, parse_by='row', max_item=None):
 	elif parse_by == 'col':
 		col_index = 0
 		for col in sheet.columns:
-			d = {}
+			fct_dict = {}
 			row_index = 0
 			for cell in col:
 				if col_index:
-					d[keys[row_index]] = cell.value
+					fct_dict[keys[row_index]] = cell.value
 				else:
 					keys.append(cell.value)
 				row_index += 1
 			if col_index:
-				d_list.append(d)
+				d_list.append(fct_dict)
 			if max_item is not None:
 				if col_index >= max_item:
 					break;
@@ -100,22 +100,8 @@ if __name__ == '__main__':
 	done_list = []
 	nb_case = 0
 	fct_list = []
-	d = {}
+	fct_dict = {}
 	for test in test_list:
-		# Check test is not already generated
-		if test['testid'] in done_list:
-			continue
-		# Check empty test line, but print comment if exists
-		if test['testid'] == "":
-			outfile.write("\n")
-			if test['comment']:
-				comment_list = test['comment'].split('\n')
-				for comment in comment_list:
-					outfile.write("//{}\n".format(comment))
-			continue
-		if test['testid'] is None:
-			continue
-		done_list.append(test['testid'])
 		fct_name = "arbtest"
 		fct_prototype = "void "
 		for i in range(21):
@@ -123,37 +109,36 @@ if __name__ == '__main__':
 				if test['test_name' + str(i)] is not None and test['test_name' + str(i)] != "":
 					fct_name += '_'
 					fct_name +=test['test_name' + str(i)].lower()
-		if fct_name not in d:
-			d[fct_name] = {}
-			d[fct_name]['test'] = []
-			d[fct_name]['param_type_list'] = []
+		if fct_name not in fct_dict:
+			fct_dict[fct_name] = {}
+			fct_dict[fct_name]['test'] = []
+			fct_dict[fct_name]['param_type_list'] = []
+		else :
+			continue
 
-		d[fct_name]['test'].append(int(test['testid']))
-
-		if fct_name not in fct_list:
-			param_type_list = []
-			fct_list.append(fct_name)
-			fct_prototype += fct_name+"("
-			for i in range(21):
-				if 'dyn_param' + str(i) in test:
-					if test['dyn_param' + str(i)] is not None and test['dyn_param' + str(i)] != "":
-						if i > 0:
-							fct_prototype += ', '
-						param_list = test['dyn_param' + str(i)].split(';')
-						p_type = param_list[1]
-						p_name = param_list[0]
-						fct_prototype += p_type
-						fct_prototype += ' '
-						fct_prototype +=  p_name
-						param_type_list.append(p_type)
-			fct_prototype += ");"
-			d[fct_name]['param_type_list'] = param_type_list
-			if test['comment']:
-				comment_list = test['comment'].split('\n')
-				for comment in comment_list:
-					outfile.write("//{}\n".format(comment))
-			outfile.write(fct_prototype)
-			outfile.write("\n")
+		param_type_list = []
+		fct_list.append(fct_name)
+		fct_prototype += fct_name+"("
+		for i in range(21):
+			if 'dyn_param' + str(i) in test:
+				if test['dyn_param' + str(i)] is not None and test['dyn_param' + str(i)] != "":
+					if i > 0:
+						fct_prototype += ', '
+					param_list = test['dyn_param' + str(i)].split(';')
+					p_type = param_list[1]
+					p_name = param_list[0]
+					fct_prototype += p_type
+					fct_prototype += ' '
+					fct_prototype +=  p_name
+					param_type_list.append(p_type)
+		fct_prototype += ");"
+		fct_dict[fct_name]['param_type_list'] = param_type_list
+		if test['comment']:
+			comment_list = test['comment'].split('\n')
+			for comment in comment_list:
+				outfile.write("//{}\n".format(comment))
+		outfile.write(fct_prototype)
+		outfile.write("\n")
 		nb_case += 1
 	outfile.write("// Automated Arb_Test Header Generator Builds {0} tests".format(nb_case))
 	outfile.write("\n#endif //  {}_INCLUDED\n".format(f_name))
@@ -168,15 +153,15 @@ if __name__ == '__main__':
 
 	outfile.write("void arb_decoder(const tArbConfig *test)\n")
 	outfile.write("{\n\tswitch(test->testid) {\n")
-	for f in d:
+	for f in fct_dict:
 		print(f)
-		for i in d[f]['test']:
+		for i in fct_dict[f]['test']:
 			outfile.write("\t\tcase {}:\n".format(i))
 		outfile.write("\t\t\t {}(".format(f))
 		first_param = True
 		cnt_int = 0
 		cnt_float = 0
-		for param in d[f]['param_type_list']:
+		for param in fct_dict[f]['param_type_list']:
 			if not first_param:
 				outfile.write(" ,")
 			if 'int' in param:
