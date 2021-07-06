@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run arb_generator",
+      "type": "shell",
+      "command": "python",
+      "args": ["arb_generator/arb_src_generator.py","--param_file=arb_generator/arb.xlsm"],
+      "group": "build",
+    }
+  ]
+}
