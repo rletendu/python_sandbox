@@ -1,7 +1,4 @@
 {
-	// Use IntelliSense to learn about possible attributes.
-	// Hover to view descriptions of existing attributes.
-	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
 		{
@@ -11,6 +8,14 @@
 			"program": "${file}",
 			"console": "integratedTerminal",
 			"args" : ["--debug", "--param_file=arb_generator/arb.xlsm"]
+		},
+		{
+			"name": "Confluence Rename",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal",
+			"args" : ["--debug", "--parent=Lifeguard2 (66106) C0 Validation", "--search_pattern=(66106) A0", "--replace_pattern=(66106) C0"]
 		}
 	]
 }
