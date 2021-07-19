@@ -4,6 +4,7 @@ import serial.tools.list_ports
 import logging
 import argparse
 import keyboard
+import time
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 
@@ -34,6 +35,9 @@ if __name__ == '__main__':
 
     ser = serial.Serial(args.com, baudrate=args.baud, timeout=3)
 
+    ser.dtr = True # DTR = 0 -> RESET = 1
+    time.sleep(0.1)
+    ser.dtr = False # DTR = 1 -> RESET = 0
     ser.write(
         "AA-FCT:arbtest_sercom_usart_selfloopback-0-0-115200-0-5-0-0-0-0-0-0-0-55\n".encode())
     print(ser.readline().decode(), end="")
