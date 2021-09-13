@@ -23,10 +23,12 @@ class ExaComTCP(object):
         self.conn, self.addr = self.TcpSoocket.accept()
 
     def send(self, data):
+        self.log.info("Sending {}".format(data))
         self.conn.send(data)
 
     def get(self):
         data = self.conn.recv(1024)
+        self.log.info("Received {}".format(data))
         return data
 
 
@@ -38,10 +40,12 @@ class ExaComSerial(object):
 
 
     def send(self, data):
+        self.log.info("Sending {}".format(data))
         self.ser.write(data)
 
     def get(self):
         data = self.ser.readline().decode()
+        self.log.info("Received {}".format(data))
         return data
 
 
@@ -53,7 +57,12 @@ class Exa(object):
     def wait_ready(self):
         pass
 
-    
+    def get_temperature(self):
+        self.ExaCom.send("GET_TEMP?\r")
+        t = self.ExaCom.get()
+        return ;
+
+
 
 
 

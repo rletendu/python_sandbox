@@ -1,6 +1,6 @@
 import logging
 import argparse
-import keyboard
+#import keyboard
 import time
 import csv
 import subprocess
@@ -32,7 +32,7 @@ if __name__ == '__main__':
             try:
                 ip = row[1]
                 print('Pinging :',ip)
-                out = subprocess.check_output(['ping','-n', '1', ip], shell=True)
+                out = subprocess.check_output(['ping', ip], shell=True)
                 print(out.decode())
             except subprocess.CalledProcessError:
                 print('Fail to ping {}'.format(ip))
