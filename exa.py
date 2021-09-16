@@ -46,10 +46,10 @@ class ExaComTCP(object):
 
 
 class ExaComSerial(object):
-    def __init__(self, port) -> None:
+    def __init__(self, port, baud=115200) -> None:
         super().__init__()
         self.log = logging.getLogger()
-        self.ser = serial.Serial(port, baudrate=9600, timeout=3)
+        self.ser = serial.Serial(port, baudrate=baud, timeout=3)
 
     def send(self, data):
         self.log.info("Sending {}".format(data))
@@ -60,6 +60,9 @@ class ExaComSerial(object):
         self.log.info("Received {}".format(data))
         return data
 
+    def __del__(self):
+        self.ser.close()
+
 class Exa(object):
     def __init__(self, com_port=None, tcp_port=None):
         if com_port is not None and tcp_port is None:
@@ -68,6 +71,9 @@ class Exa(object):
             self.ExaCom = ExaComTCP(port=tcp_port)
         else:
             raise "Invalid Exatron Interface"
+        self.soak = 4
+        self.low_band = 200
+        self.high_band = 200
 
     def wait_ready(self):
         r = self.ExaCom.get()
@@ -105,7 +111,7 @@ class Exa(object):
             shiller = "ROOM"
         elif temp > 25:
             shiller = "HOT"
-        self.ExaCom.send("SET_TEMP,{},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,4".format(temp,shiller))
+        self.ExaCom.send("SET_TEMP,{},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}\r".format(temp,shiller, self.soak))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
