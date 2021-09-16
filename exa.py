@@ -146,9 +146,10 @@ if __name__ == '__main__':
 
     exatron = Exa(com_port=)
     exatron.wait_ready()
-    exatron.set_temperature(25)
-    exatron.load_next_part()
-    time.sleep(10)
-    exatron.unload_part()
+    for i in range(5):
+        exatron.set_temperature(25)
+        exatron.load_next_part()
+        time.sleep(10)
+        exatron.unload_part()
 
     
