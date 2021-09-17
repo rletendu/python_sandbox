@@ -64,18 +64,26 @@ class ExaComSerial(object):
         self.ser.close()
 
 class Exa(object):
-    def __init__(self, com_port=None, tcp_port=None):
+    def __init__(self, com_port=None, tcp_port=None, demo=False):
+        self.demo = demo
+        self.soak = 4
+        self.low_band = 200
+        self.high_band = 200
+        self.temperature = self.get_temperature()
+        if self.demo:
+            return
         if com_port is not None and tcp_port is None:
             self.ExaCom = ExaComSerial(port=com_port)
         elif com_port is None and tcp_port is not None:
             self.ExaCom = ExaComTCP(port=tcp_port)
         else:
             raise "Invalid Exatron Interface"
-        self.soak = 4
-        self.low_band = 200
-        self.high_band = 200
+
 
     def wait_ready(self):
+        if self.demo:
+            time.sleep(1)
+            return True
         r = self.ExaCom.get()
         if r =="H\r":
             return True
@@ -83,12 +91,17 @@ class Exa(object):
             return False
 
     def get_temperature(self):
+        if self.demo:
+            return self.temperature
         self.ExaCom.send("GET_TEMP?\r")
         r = self.ExaCom.get()
         t = float(r.replace("CUR_TEMP,","").replace("\r"))
         return t
 
     def load_next_part(self):
+        if self.demo:
+            self.log.info("Loading next part")
+            return True
         self.ExaCom.send("R\r")
         r = self.ExaCom.get()
         if r =="OK\r":
@@ -97,6 +110,9 @@ class Exa(object):
             return False
         
     def unload_part(self, bin=1):
+        if self.demo:
+            self.log.info("Unloading part with bin {}".format(bin))
+            return True
         self.ExaCom.send("TEST_RESULT,{}\r".format(bin))
         r = self.ExaCom.get()
         if r =="OK\r":
@@ -111,6 +127,9 @@ class Exa(object):
             shiller = "ROOM"
         elif temp > 25:
             shiller = "HOT"
+        if self.demo:
+            self.log.info("Seting temp {} shiller {}".format(temp,shiller))
+            return True
         self.ExaCom.send("SET_TEMP,{},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}\r".format(temp,shiller, self.soak))
         r = self.ExaCom.get()
         if r =="OK\r":
@@ -119,6 +138,9 @@ class Exa(object):
             return False
     
     def end_of_lot(self):
+        if self.demo:
+            self.log.info("Sending EOL")
+            return True
         self.ExaCom.send("EOL\r")
         r = self.ExaCom.get()
         if r =="OK\r":
@@ -130,6 +152,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true',
                         help='Activate Debug mode with verbose execution trace information')
+    parser.add_argument('--demo', action='store_true',
+                        help='Activate Demo mode')
+    parser.add_argument('--com', default=None,
+                        help='Serial com port')
+    parser.add_argument('--tcp_port', action=None,
+                        help='TCP IP server port number')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG, format=LOGGING_FORMAT,)
@@ -141,8 +169,17 @@ if __name__ == '__main__':
     else:
         log.setLevel(logging.CRITICAL)
 
+    print("Machine IPs:")
+    print(socket.gethostbyname(socket.gethostname()))
+    from netifaces import interfaces, ifaddresses, AF_INET
+    for ifaceName in interfaces():
+        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+        print(' '.join(addresses))
 
-	com_list = serial.tools.list_ports.comports()
+
+    com_list = serial.tools.list_ports.comports()
+    if len(com_list)==0:
+        print("No COM port available on this machine")
     for com in com_list:
         log.info(com)
         if args.com is None:
@@ -150,7 +187,7 @@ if __name__ == '__main__':
             print("No COM port specified using {}".format(args.com))
             break
 
-    exatron = Exa(com_port=)
+    exatron = Exa(com_port=args.com)
     exatron.wait_ready()
     for i in range(5):
         exatron.set_temperature(25)
