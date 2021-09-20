@@ -7,6 +7,9 @@ import threading
 import serial
 import serial.tools.list_ports
 import time
+from netifaces import interfaces, ifaddresses, AF_INET
+
+
 
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
@@ -25,16 +28,21 @@ HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 DEFAULT_PORT = 65432        # P
 
 class ExaComTCP(object):
-    def __init__(self, port=DEFAULT_PORT) -> None:
+    def __init__(self, host=HOST, port=DEFAULT_PORT) -> None:
         super().__init__()
         self.log = logging.getLogger()
-        self.TcpSoocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.TcpSoocket.bind((HOST, port))
-        self.conn, self.addr = self.TcpSoocket.accept()
+   
+        #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.bind((host, port))
+        self.server.listen(1)
+        self.log.info("TCP Server listening on {}:{}".format(host, port))
+        (self.conn, self.addr) = self.server.accept()
+        self.log.info("TCP connection with {}".format(self.addr[0]))
 
     def send(self, data):
         self.log.info("Sending {}".format(data))
-        self.conn.send(data)
+        self.conn.send(data.encode())
 
     def get(self):
         data = self.conn.recv(1024)
@@ -42,7 +50,8 @@ class ExaComTCP(object):
         return data
 
     def __del__(self):
-        self.TcpSoocket.close()
+        self.conn.close()
+        self.server.close()
 
 
 class ExaComSerial(object):
@@ -53,7 +62,7 @@ class ExaComSerial(object):
 
     def send(self, data):
         self.log.info("Sending {}".format(data))
-        self.ser.write(data)
+        self.ser.write(data.encode())
 
     def get(self):
         data = self.ser.readline().decode()
@@ -65,17 +74,19 @@ class ExaComSerial(object):
 
 class Exa(object):
     def __init__(self, com_port=None, tcp_port=None, demo=False):
+        self.log = logging.getLogger()
         self.demo = demo
         self.soak = 4
         self.low_band = 200
         self.high_band = 200
-        self.temperature = self.get_temperature()
+        self.temperature = 25
         if self.demo:
             return
         if com_port is not None and tcp_port is None:
             self.ExaCom = ExaComSerial(port=com_port)
         elif com_port is None and tcp_port is not None:
-            self.ExaCom = ExaComTCP(port=tcp_port)
+            local_ip = socket.gethostbyname(socket.gethostname())
+            self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip)
         else:
             raise "Invalid Exatron Interface"
 
@@ -104,14 +115,15 @@ class Exa(object):
             return True
         self.ExaCom.send("R\r")
         r = self.ExaCom.get()
+        #'INPUT_TRAY,1,ROW,1,COL,1\r'
         if r =="OK\r":
             return True
         else:
             return False
         
     def unload_part(self, bin=1):
+        self.log.info("Unloading part with bin {}".format(bin))
         if self.demo:
-            self.log.info("Unloading part with bin {}".format(bin))
             return True
         self.ExaCom.send("TEST_RESULT,{}\r".format(bin))
         r = self.ExaCom.get()
@@ -130,7 +142,7 @@ class Exa(object):
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
             return True
-        self.ExaCom.send("SET_TEMP,{},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}\r".format(temp,shiller, self.soak))
+        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}\r".format(temp,shiller, self.soak))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
@@ -148,13 +160,14 @@ class Exa(object):
         else:
             return False
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true',
                         help='Activate Debug mode with verbose execution trace information')
     parser.add_argument('--demo', action='store_true',
                         help='Activate Demo mode')
-    parser.add_argument('--com', default=None,
+    parser.add_argument('--com_port', default=None,
                         help='Serial com port')
     parser.add_argument('--tcp_port', action=None,
                         help='TCP IP server port number')
@@ -169,30 +182,37 @@ if __name__ == '__main__':
     else:
         log.setLevel(logging.CRITICAL)
 
-    print("Machine IPs:")
-    print(socket.gethostbyname(socket.gethostname()))
-    from netifaces import interfaces, ifaddresses, AF_INET
-    for ifaceName in interfaces():
-        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
-        print(' '.join(addresses))
+    print("Machine Local IP:")
+    local_ip = socket.gethostbyname(socket.gethostname())
+    print(local_ip)
 
+#    for ifaceName in interfaces():
+#        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
+#        print(' '.join(addresses))
 
+    
     com_list = serial.tools.list_ports.comports()
     if len(com_list)==0:
         print("No COM port available on this machine")
     for com in com_list:
         log.info(com)
-        if args.com is None:
-            args.com = com.device
-            print("No COM port specified using {}".format(args.com))
+        if args.com_port is None:
+            args.com_port = com.device
+            print("No COM port specified using {}".format(args.com_port))
             break
+    if args.tcp_port is None:
+        exatron = Exa(com_port=args.com_port)
+    else:
+        exatron = Exa(tcp_port=int(args.tcp_port))
 
-    exatron = Exa(com_port=args.com)
     exatron.wait_ready()
     for i in range(5):
         exatron.set_temperature(25)
+        time.sleep(1)
         exatron.load_next_part()
-        time.sleep(10)
+        print("Dummy testing time for 5s ...")
+        time.sleep(5)
         exatron.unload_part()
+        time.sleep(1)
+    exatron.end_of_lot()
 
-    
