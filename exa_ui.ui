@@ -143,7 +143,7 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QPushButton" name="eolButton">
+       <widget class="QPushButton" name="pichPartButton">
         <property name="text">
          <string>Pick Next Part</string>
         </property>
@@ -190,7 +190,7 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="pichPartButton">
+       <widget class="QPushButton" name="eolButton">
         <property name="text">
          <string>End Of Lot</string>
         </property>

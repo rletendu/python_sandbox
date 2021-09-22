@@ -27,27 +27,44 @@ LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(fu
 HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 DEFAULT_PORT = 65432        # P
 
-class ExaComTCP(object):
+class ExaComTCP(threading.Thread):
     def __init__(self, host=HOST, port=DEFAULT_PORT) -> None:
         super().__init__()
         self.log = logging.getLogger()
-   
+        self.connected = False
         #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(1)
         self.log.info("TCP Server listening on {}:{}".format(host, port))
+        #(self.conn, self.addr) = self.server.accept()
+        #self.log.info("TCP connection with {}".format(self.addr[0]))
+
+    def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
+        self.conn.settimeout(2)
         self.log.info("TCP connection with {}".format(self.addr[0]))
+        self.connected = True
+        while (self.conn):
+            time.sleep(1)
+
+    def is_connected(self):
+        return self.connected
 
     def send(self, data):
-        self.log.info("Sending {}".format(data))
-        self.conn.send(data.encode())
+        if self.is_connected:
+            self.log.info("Sending {}".format(data))
+            self.conn.send(data.encode())
 
     def get(self):
-        data = self.conn.recv(1024)
-        self.log.info("Received {}".format(data))
-        return data
+        if self.is_connected:
+            try:
+                data = self.conn.recv(1024)
+                self.log.info("Received {}".format(data))
+                return data
+            except socket.timeout: 
+                self.log.info("No answer from client (timeout)")
+                return ""
 
     def __del__(self):
         self.conn.close()
@@ -87,6 +104,7 @@ class Exa(object):
         elif com_port is None and tcp_port is not None:
             local_ip = socket.gethostbyname(socket.gethostname())
             self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip)
+            self.ExaCom.start()
         else:
             raise "Invalid Exatron Interface"
 
@@ -104,16 +122,16 @@ class Exa(object):
     def get_temperature(self):
         if self.demo:
             return self.temperature
-        self.ExaCom.send("GET_TEMP?\r")
+        self.ExaCom.send("GET_TEMP?")
         r = self.ExaCom.get()
-        t = float(r.replace("CUR_TEMP,","").replace("\r"))
+        t = float(r.replace("CUR_TEMP,","").replace("\r",''))
         return t
 
     def load_next_part(self):
         if self.demo:
             self.log.info("Loading next part")
             return True
-        self.ExaCom.send("R\r")
+        self.ExaCom.send("R")
         r = self.ExaCom.get()
         #'INPUT_TRAY,1,ROW,1,COL,1\r'
         if r =="OK\r":
@@ -125,7 +143,7 @@ class Exa(object):
         self.log.info("Unloading part with bin {}".format(bin))
         if self.demo:
             return True
-        self.ExaCom.send("TEST_RESULT,{}\r".format(bin))
+        self.ExaCom.send("TEST_RESULT,{}".format(bin))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
@@ -142,7 +160,7 @@ class Exa(object):
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
             return True
-        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}\r".format(temp,shiller, self.soak))
+        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}".format(temp,shiller, self.soak))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
@@ -153,12 +171,15 @@ class Exa(object):
         if self.demo:
             self.log.info("Sending EOL")
             return True
-        self.ExaCom.send("EOL\r")
+        self.ExaCom.send("EOL")
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
         else:
             return False
+
+    def close(self):
+        self.ExaCom.__del__()
 
 
 if __name__ == '__main__':

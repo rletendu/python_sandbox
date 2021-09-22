@@ -105,6 +105,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.interfaceBox.addItem(com.device)
             break
 
+    def closeEvent(self, event):
+        self.exatron.__del__()
+        event.accept()
 
     @pyqtSlot()
     def connect(self):
@@ -181,4 +184,7 @@ if __name__ == '__main__':
     sig.go_signal.emit()
     sleep(0.5)
 
-    sys.exit(app.exec_())
+    try:
+        sys.exit(app.exec_())
+    except KeyboardInterrupt:
+        print("Done")
