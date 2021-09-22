@@ -78,6 +78,7 @@ class ExaComSerial(object):
         self.ser = serial.Serial(port, baudrate=baud, timeout=3)
 
     def send(self, data):
+        data = "{}\r".format(data)
         self.log.info("Sending {}".format(data))
         self.ser.write(data.encode())
 
@@ -94,8 +95,8 @@ class Exa(object):
         self.log = logging.getLogger()
         self.demo = demo
         self.soak = 4
-        self.low_band = 200
-        self.high_band = 200
+        self.low_band = 2.0
+        self.high_band = 2.0
         self.temperature = 25
         if self.demo:
             return
