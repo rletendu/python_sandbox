@@ -8,7 +8,7 @@ import serial
 import serial.tools.list_ports
 import time
 from netifaces import interfaces, ifaddresses, AF_INET
-
+import queue
 
 
 
@@ -32,6 +32,7 @@ class ExaComTCP(threading.Thread):
         super().__init__()
         self.log = logging.getLogger()
         self.connected = False
+        self.q = queue.Queue()
         #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
@@ -42,11 +43,9 @@ class ExaComTCP(threading.Thread):
 
     def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
+        self.connected = True
         self.conn.settimeout(2)
         self.log.info("TCP connection with {}".format(self.addr[0]))
-        self.connected = True
-        while (self.conn):
-            time.sleep(1)
 
     def is_connected(self):
         return self.connected

@@ -90,7 +90,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
-        self.timer.start(100)
+        
         self.setTempButton.clicked.connect(self.settemp)
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
@@ -104,6 +104,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for com in com_list:
             self.interfaceBox.addItem(com.device)
             break
+        self.statusbar.showMessage('Select an Interface to open')
 
     def closeEvent(self, event):
         self.exatron.__del__()
@@ -115,8 +116,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             interface = self.interfaceBox.currentText()
             if interface.startswith("COM"):
                 self.exatron = Exa(com_port=interface)
+                self.statusbar.showMessage('{} Openned'.format(interface))
             else:
                 self.exatron = Exa(tcp_port=self.tcpPortBox.value())
+                self.statusbar.showMessage('Server {} waiting client connection'.format(interface))
+                self.timer.start(100)
             
     @pyqtSlot()
     def settemp(self):
