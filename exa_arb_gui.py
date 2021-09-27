@@ -9,10 +9,12 @@ from PyQt5 import QtWidgets
 from time import sleep
 from queue import Queue
 from exa import Exa
-from exa_ui import Ui_MainWindow
+from exa_arb_ui import Ui_ExatronARB
 import serial
 import serial.tools.list_ports
 import socket
+import traceback
+from exa_job_thread import ExaJobSignals,ExaJobThread
 
 
 
@@ -81,7 +83,7 @@ class StdStreamThread(QObject):
         self.run_flag = False
 
 
-class MainWindow(QMainWindow, Ui_MainWindow):
+class MainWindow(QMainWindow, Ui_ExatronARB):
 
     changed = pyqtSignal(QMimeData)
 
@@ -90,14 +92,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
-        
-        self.setTempButton.clicked.connect(self.settemp)
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
-        self.pichPartButton.clicked.connect(self.pickNextPart)
-        self.eolButton.clicked.connect(self.endOfLot)
-        self.unLoadpart.clicked.connect(self.unloadPart)
-        self.getTempButton.clicked.connect(self.gettemp)
+        self.startButton.clicked.connect(self.start)
+
+        self.sig_job = None
+        self.worker = None
+
         local_ip = socket.gethostbyname(socket.gethostname())
         self.interfaceBox.addItem(local_ip)
         com_list = serial.tools.list_ports.comports()
@@ -121,31 +122,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.exatron = Exa(tcp_port=self.tcpPortBox.value())
                 self.statusbar.showMessage('Server {} waiting client connection'.format(interface))
                 self.timer.start(500)
+
+
+    @pyqtSlot()
+    def start(self):
+        if self.worker is None:
+            self.part_list = self.partsEdit.text().split(",")
+            for i in range(len(self.part_list)):
+                self.part_list[i] = int(self.part_list[i])
+            self.temp_list = self.tempEdit.text().split(",")
+            for i in range(len(self.temp_list)):
+                self.temp_list[i] = int(self.temp_list[i])
+            self.cmd = self.cmdLineEdit.text()
+            print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
             
-    @pyqtSlot()
-    def settemp(self):
-        t = self.setTempVal.value()
-        s = self.tempRangeBox.currentText()
-        self.exatron.set_temperature(t)
-        print('Settemp {} {}'.format(t,s))
-        pass
+            self.sig_job = ExaJobSignals()
+            self.worker = ExaJobThread(self.exatron, self.sig_job)
+            self.sig_job.start_suite.connect(self.worker.run)
 
-    @pyqtSlot()
-    def gettemp(self):
-        t = self.exatron.get_temperature()
-        self.getTempVal.value(t)
+            self.sig_job.notify_progress.connect(self.notify_progress)
+            self.suite_thread = QThread()
+            self.worker.moveToThread(self.suite_thread)
+            self.suite_thread.start()
+            self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
 
-    @pyqtSlot()
-    def endOfLot(self):
-        self.exatron.end_of_lot()
 
-    @pyqtSlot()
-    def pickNextPart(self):
-        self.exatron.load_next_part()
-
-    @pyqtSlot()
-    def unloadPart(self):
-        self.exatron.unload_part(self.binBox.value())
+    @pyqtSlot(str, int, int)
+    def notify_progress(self, text, part, temp):
+        self.cur_part.setText("Curent Part: {}".format(part))
+        self.cur_temp.setText("Curent Temp: {}".format(temp))
+        self.tempProgressBar.setValue(100*((self.temp_list.index(temp)+1)/len(self.temp_list)))
+        self.partProgressBar.setValue(100*((self.part_list.index(part)+1)/len(self.part_list)))
 
     @pyqtSlot()
     def Time(self):

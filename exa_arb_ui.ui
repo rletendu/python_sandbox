@@ -7,14 +7,14 @@
     <x>0</x>
     <y>0</y>
     <width>811</width>
-    <height>695</height>
+    <height>555</height>
    </rect>
   </property>
   <property name="acceptDrops">
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>ExaJobLauncher</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -53,7 +53,28 @@
         </property>
        </spacer>
       </item>
+      <item>
+       <widget class="QPushButton" name="aboartButton">
+        <property name="text">
+         <string>Abort</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="startButton">
+        <property name="text">
+         <string>Start</string>
+        </property>
+       </widget>
+      </item>
      </layout>
+    </item>
+    <item>
+     <widget class="QLineEdit" name="cmdLineEdit">
+      <property name="text">
+       <string>arb_tester --fixed_temperature={temperature} --part_id=={part}</string>
+      </property>
+     </widget>
     </item>
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
@@ -65,10 +86,14 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit_2"/>
+       <widget class="QLineEdit" name="tempEdit">
+        <property name="text">
+         <string>25,85,-40</string>
+        </property>
+       </widget>
       </item>
       <item>
-       <spacer name="horizontalSpacer">
+       <spacer name="horizontalSpacer_3">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -81,21 +106,16 @@
        </spacer>
       </item>
       <item>
-       <widget class="QLCDNumber" name="getTempVal">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>39</height>
-         </size>
+       <widget class="QLabel" name="cur_temp">
+        <property name="text">
+         <string>25</string>
         </property>
-        <property name="smallDecimalPoint">
-         <bool>false</bool>
-        </property>
-        <property name="segmentStyle">
-         <enum>QLCDNumber::Flat</enum>
-        </property>
-        <property name="value" stdset="0">
-         <double>25.500000000000000</double>
+       </widget>
+      </item>
+      <item>
+       <widget class="QProgressBar" name="tempProgressBar">
+        <property name="value">
+         <number>0</number>
         </property>
        </widget>
       </item>
@@ -111,7 +131,11 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit"/>
+       <widget class="QLineEdit" name="partsEdit">
+        <property name="text">
+         <string>1,2,3</string>
+        </property>
+       </widget>
       </item>
       <item>
        <spacer name="horizontalSpacer_4">
@@ -125,6 +149,20 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="cur_part">
+        <property name="text">
+         <string>10</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QProgressBar" name="partProgressBar">
+        <property name="value">
+         <number>0</number>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>

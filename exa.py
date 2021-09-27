@@ -32,6 +32,7 @@ class ExaComTCP(threading.Thread):
         super().__init__()
         self.log = logging.getLogger()
         self.connected = False
+        self.ready = False
         self.q = queue.Queue()
         #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -44,11 +45,17 @@ class ExaComTCP(threading.Thread):
     def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
         self.connected = True
-        self.conn.settimeout(2)
+        r = self.get()
+        if r =="H\r":
+            self.ready = True
+        #self.conn.settimeout()
         self.log.info("TCP connection with {}".format(self.addr[0]))
 
     def is_connected(self):
         return self.connected
+
+    def is_ready(self):
+        return self.ready
 
     def send(self, data):
         if self.is_connected:
@@ -60,10 +67,12 @@ class ExaComTCP(threading.Thread):
             try:
                 data = self.conn.recv(1024)
                 self.log.info("Received {}".format(data))
-                return data
+                return data.decode()
             except socket.timeout: 
                 self.log.info("No answer from client (timeout)")
                 return ""
+        else:
+            return ""
 
     def __del__(self):
         self.conn.close()
@@ -97,6 +106,7 @@ class Exa(object):
         self.low_band = 2.0
         self.high_band = 2.0
         self.temperature = 25
+        self.ready = False
         if self.demo:
             return
         if com_port is not None and tcp_port is None:
@@ -115,9 +125,14 @@ class Exa(object):
             return True
         r = self.ExaCom.get()
         if r =="H\r":
+            self.ready = True
             return True
         else:
+            self.ready = False
             return False
+
+    def is_ready(self):
+        return self.ExaCom.is_ready()
 
     def get_temperature(self):
         if self.demo:
@@ -168,6 +183,7 @@ class Exa(object):
             return False
     
     def end_of_lot(self):
+        self.ready = False
         if self.demo:
             self.log.info("Sending EOL")
             return True
