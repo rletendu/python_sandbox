@@ -99,12 +99,12 @@ class ExaComSerial(object):
         self.ser.close()
 
 class Exa(object):
-    def __init__(self, com_port=None, tcp_port=None, demo=False):
+    def __init__(self, com_port=None, tcp_port=None, demo=False, accuracy=2.0, soak=4):
         self.log = logging.getLogger()
         self.demo = demo
-        self.soak = 4
-        self.low_band = 2.0
-        self.high_band = 2.0
+        self.soak = soak
+        self.low_band = accuracy
+        self.high_band = accuracy
         self.temperature = 25
         self.ready = False
         if self.demo:
