@@ -95,6 +95,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.start)
+        self.aboartButton.clicked.connect(self.abort)
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
 
@@ -196,6 +197,10 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.statusbar.showMessage("Handler is ready!")
         pass
 
+    @pyqtSlot()
+    def abort(self):
+        if self.worker is not None:
+            self.worker.abort()
     @pyqtSlot(str)
     def append_log(self, text):
         self.logBrowser.moveCursor(QTextCursor.End)

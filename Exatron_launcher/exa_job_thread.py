@@ -54,7 +54,7 @@ class ExaJobThread(QObject):
 				self.exatron.set_temperature(temperature)
 				while True:
 					t = self.exatron.get_temperature()
-					if abs( t - temperature ) < self.accuracy:
+					if abs( t - temperature ) < self.temp_accuracy:
 
 						break
 					time.sleep(2)
@@ -69,7 +69,7 @@ class ExaJobThread(QObject):
 
 			if self.abort_request:
 				break
-			self.exatron.load_next_part()
+			self.exatron.unload_part()
 
 	@pyqtSlot(int)
 	def process_finished(self, rcode):
@@ -88,6 +88,7 @@ class ExaJobThread(QObject):
 		self.log.debug("Abort Measure Thread Event Received")
 		print("Abort Request")
 		self.abort_request = True
+		self.p.kill()
 
 
 	@pyqtSlot()

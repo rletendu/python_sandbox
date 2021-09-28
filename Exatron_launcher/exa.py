@@ -172,8 +172,11 @@ class Exa(object):
             shiller = "ROOM"
         elif temp > 25:
             shiller = "HOT"
+
+
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
+            self.temperature = temp
             return True
         self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}".format(temp,shiller, self.soak))
         r = self.ExaCom.get()
