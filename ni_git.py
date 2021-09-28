@@ -11,9 +11,9 @@ REPOS = [
         'dst': "C:\\Program Files\\National Instruments\\LabVIEW 2019\\instr.lib"},
     {'name': 'user.lib', 'url': "ssh://git@bitbucket.microchip.com/sof/user.lib.git",
         'dst': "C:\\Program Files\\National Instruments\\LabVIEW 2019\\user.lib"},
-    {'name': 'Components', 'url': "ssh://bitbucket.microchip.com/scm/sof/components.git",
+    {'name': 'Components', 'url': "ssh://bitbucket.microchip.com/sof/components.git",
         'dst': "C:\\Users\Public\\Documents\\National Instruments\\TestStand 2019 (64-bit)\\Components"},
-    {'name': 'System', 'url': "ssh://bitbucket.microchip.com/scm/sof/mchp.lvlib.git",
+    {'name': 'System', 'url': "ssh://bitbucket.microchip.com/sof/mchp.lvlib.git",
         'dst': "C:\\Users\Public\\Documents\\National Instruments\\TestStand 2019 (64-bit)\\Applications\\Microchip\\System"}
 ]
 
@@ -32,9 +32,23 @@ def empty_folder(root_dir):
         for name in dirs:
             shutil.rmtree(os.path.join(root, name))
 
+import ctypes, sys
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+
 
 if __name__ == '__main__':
-
+    if is_admin():
+        # Code of your program here
+        pass
+        print("Runned as admin")
+    else:
+        # Re-run the program with admin rights
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true',
                         help='Activate Debug mode with verbose execution trace information')

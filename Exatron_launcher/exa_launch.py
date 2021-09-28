@@ -9,7 +9,7 @@ from PyQt5 import QtWidgets
 from time import sleep
 from queue import Queue
 from exa import Exa
-from exa_arb_ui import Ui_ExatronARB
+from exa_launch_ui import Ui_ExaJobLauncher
 import serial
 import serial.tools.list_ports
 import socket
@@ -83,7 +83,7 @@ class StdStreamThread(QObject):
         self.run_flag = False
 
 
-class MainWindow(QMainWindow, Ui_ExatronARB):
+class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     changed = pyqtSignal(QMimeData)
 
@@ -108,8 +108,9 @@ class MainWindow(QMainWindow, Ui_ExatronARB):
             self.interfaceBox.addItem(com.device)
             break
         self.interfaceBox.addItem("demo")
+        self.aboartButton.setVisible(False)
+        self.startButton.setVisible(False)
         self.statusbar.showMessage('Select an Interface to open')
-        self.
 
     @pyqtSlot()
     def menuOpen(self):
@@ -153,6 +154,8 @@ class MainWindow(QMainWindow, Ui_ExatronARB):
                 self.exatron = Exa(tcp_port=self.tcpPortBox.value())
                 self.statusbar.showMessage('Server {} waiting client connection'.format(interface))
                 self.timer.start(500)
+            self.aboartButton.setVisible(True)
+            self.startButton.setVisible(True)
 
 
     @pyqtSlot()

@@ -7,6 +7,15 @@
       "command": "python",
       "args": ["arb_generator/arb_src_generator.py","--param_file=arb_generator/arb.xlsm"],
       "group": "build",
+    },
+    {
+      "label": "Run Exatron",
+      "type": "shell",
+      "command": "python",
+      "args": ["exa.py","--debug"],
+      "group": "build",
     }
+
   ]
 }
+

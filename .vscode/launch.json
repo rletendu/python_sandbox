@@ -1,6 +1,7 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+
 		{
 			"name": "Python: Current File",
 			"type": "python",
@@ -16,6 +17,23 @@
 			"program": "${file}",
 			"console": "integratedTerminal",
 			"args" : ["--debug", "--parent=Lifeguard2 (66106) C0 Validation", "--search_pattern=(66106) A0", "--replace_pattern=(66106) C0"]
-		}
+		},
+		{
+			"name": "Exatron",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal",
+			"args" : ["--debug"]
+		},
+		{
+			"name": "Exatron TCP",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal",
+			"args" : ["--debug", "--tcp_port=4000"]
+		},
+
 	]
 }
