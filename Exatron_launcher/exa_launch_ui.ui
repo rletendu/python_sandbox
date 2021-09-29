@@ -54,7 +54,7 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="aboartButton">
+       <widget class="QPushButton" name="abortButton">
         <property name="text">
          <string>Abort</string>
         </property>
@@ -62,6 +62,9 @@
       </item>
       <item>
        <widget class="QPushButton" name="startButton">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
         <property name="text">
          <string>Start</string>
         </property>
@@ -134,9 +137,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="label_3">
+       <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Accuracy</string>
+         <string>Soak</string>
         </property>
        </widget>
       </item>
@@ -151,9 +154,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="label_4">
+       <widget class="QLabel" name="label_3">
         <property name="text">
-         <string>Soak</string>
+         <string>Accuracy</string>
         </property>
        </widget>
       </item>
@@ -293,7 +296,14 @@
     <addaction name="actionopen"/>
     <addaction name="actionsave"/>
    </widget>
+   <widget class="QMenu" name="menuoptions">
+    <property name="title">
+     <string>options</string>
+    </property>
+    <addaction name="actiondebug"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuoptions"/>
   </widget>
   <action name="actionGogo">
    <property name="text">
@@ -308,6 +318,11 @@
   <action name="actionsave">
    <property name="text">
     <string>save</string>
+   </property>
+  </action>
+  <action name="actiondebug">
+   <property name="text">
+    <string>debug</string>
    </property>
   </action>
  </widget>

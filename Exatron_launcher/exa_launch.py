@@ -3,7 +3,7 @@ import argparse
 from PyQt5.QtCore import pyqtSignal, QMimeData, QTimer, Qt
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtCore import QObject, QThread
-from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog
+from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog, QMessageBox
 from PyQt5.QtGui import QTextCursor
 from PyQt5 import QtWidgets
 from time import sleep
@@ -16,9 +16,11 @@ import socket
 import traceback
 from exa_job_thread import ExaJobSignals,ExaJobThread
 import configparser
+import os
 
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
+GUI_CONFIG_FILE = "exa_launch.ini"
 
 def excepthook(exc_type, exc_value, exc_tb):
     tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
@@ -90,14 +92,17 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
+        self.load_ini_file()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.start)
-        self.aboartButton.clicked.connect(self.abort)
+        self.abortButton.clicked.connect(self.abort)
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
+        self.actiondebug.setCheckable(True)
+        self.actiondebug.triggered.connect(self.debug_enable)
 
         self.sig_job = None
         self.worker = None
@@ -109,9 +114,31 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.interfaceBox.addItem(com.device)
             break
         self.interfaceBox.addItem("demo")
-        self.aboartButton.setVisible(False)
-        self.startButton.setVisible(False)
-        self.statusbar.showMessage('Select an Interface to open')
+        self.abortButton.setEnabled(False)
+        self.startButton.setEnabled(False)
+        self.statusbar.showMessage('Select an Exatron Interface')
+
+    def load_ini_file(self):
+        config = configparser.ConfigParser()
+        f = open(GUI_CONFIG_FILE, "a+")
+        if os.stat(GUI_CONFIG_FILE).st_size == 0:
+            # ini file does not exits, creating
+            f.close()
+            config['LAST_SETTINGS'] = {'suite_file': '', 'com_port': ''}
+            with open(GUI_CONFIG_FILE, "w") as gui_config_file:
+                config.write(gui_config_file)
+
+    def write_ini_fiel(self):
+        pass
+
+    @pyqtSlot()
+    def debug_enable(self):
+        if self.actiondebug.isChecked():
+            print("DEBUG mode ON")
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            print("DEBUG mode OFF")
+            logging.getLogger().setLevel(logging.ERROR)
 
     @pyqtSlot()
     def menuOpen(self):
@@ -138,7 +165,16 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
 
     def closeEvent(self, event):
-        self.exatron.__del__()
+        result = QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?", QMessageBox.Yes | QMessageBox.No)
+        event.ignore()
+        if result == QMessageBox.Yes:
+            event.accept()
+            config = configparser.ConfigParser()
+            config['LAST_SETTINGS'] = {}
+            config['LAST_SETTINGS']['suite_file'] = self.param_file
+            config['LAST_SETTINGS']['com_port'] = self.comboBox_com_list.currentText()
+            with open(GUI_CONFIG_FILE, 'w') as configfile:
+                config.write(configfile)
         event.accept()
 
     @pyqtSlot()
@@ -154,34 +190,36 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             else:
                 self.exatron = Exa(tcp_port=self.tcpPortBox.value())
                 self.statusbar.showMessage('Server {} waiting client connection'.format(interface))
-                self.timer.start(500)
-            self.aboartButton.setVisible(True)
-            self.startButton.setVisible(True)
+            self.timer.start(500)
+            self.sig_job = ExaJobSignals()
+            self.accuracy = self.tempAccuracySpinBox.value()
+            self.soak_time = self.tempSoakSpinBox.value()
+            self.worker = ExaJobThread(self.exatron, self.sig_job, temp_soak=self.soak_time, temp_accuracy=self.accuracy)
+            self.sig_job.start_suite.connect(self.worker.run)
+            self.sig_job.notify_progress.connect(self.notify_progress)
+            self.sig_job.all_done.connect(self.all_done)
+            self.suite_thread = QThread()
+            self.worker.moveToThread(self.suite_thread)
+            self.suite_thread.start()
 
 
     @pyqtSlot()
     def start(self):
-        if self.worker is None:
-            self.part_list = self.partsEdit.text().replace(" ","").split(",")
-            for i in range(len(self.part_list)):
-                self.part_list[i] = int(self.part_list[i])
-            self.temp_list = self.tempEdit.text().replace(" ","").split(",")
-            for i in range(len(self.temp_list)):
-                self.temp_list[i] = int(self.temp_list[i])
-            self.cmd = self.cmdLineEdit.text()
-            self.accuracy = self.tempAccuracySpinBox.value()
-            self.soak_time = self.tempSoakSpinBox.value()
-            print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
-            
-            self.sig_job = ExaJobSignals()
-            self.worker = ExaJobThread(self.exatron, self.sig_job, temp_soak=self.soak_time, temp_accuracy=self.accuracy)
-            self.sig_job.start_suite.connect(self.worker.run)
+        self.abortButton.setEnabled(True)
+        self.startButton.setEnabled(False)
 
-            self.sig_job.notify_progress.connect(self.notify_progress)
-            self.suite_thread = QThread()
-            self.worker.moveToThread(self.suite_thread)
-            self.suite_thread.start()
-            self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
+        self.part_list = self.partsEdit.text().replace(" ","").split(",")
+        for i in range(len(self.part_list)):
+            self.part_list[i] = int(self.part_list[i])
+        self.temp_list = self.tempEdit.text().replace(" ","").split(",")
+        for i in range(len(self.temp_list)):
+            self.temp_list[i] = int(self.temp_list[i])
+        self.cmd = self.cmdLineEdit.text()
+
+        print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
+
+
+        self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
 
     @pyqtSlot(str, int, int)
     def notify_progress(self, text, part, temp):
@@ -189,18 +227,30 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.cur_temp.setText("Curent Temp: {}".format(temp))
         self.tempProgressBar.setValue(100*((self.temp_list.index(temp)+1)/len(self.temp_list)))
         self.partProgressBar.setValue(100*((self.part_list.index(part)+1)/len(self.part_list)))
+        if len(text):
+            self.statusbar.showMessage(text)
 
     @pyqtSlot()
     def Time(self):
+        if self.exatron.is_connected():
+            self.statusbar.showMessage("Handler client is connected, waiting ready")
         if self.exatron.is_ready():
             self.timer.stop()
             self.statusbar.showMessage("Handler is ready!")
+            self.abortButton.setEnabled(False)
+            self.startButton.setEnabled(True)
         pass
 
     @pyqtSlot()
     def abort(self):
         if self.worker is not None:
             self.worker.abort()
+
+    @pyqtSlot()
+    def all_done(self):
+        self.abortButton.setEnabled(False)
+        self.startButton.setEnabled(True)
+
     @pyqtSlot(str)
     def append_log(self, text):
         self.logBrowser.moveCursor(QTextCursor.End)
@@ -229,9 +279,9 @@ if __name__ == '__main__':
         sys.stdout = WriteStream(queue)
         sys.stderr = WriteStream(queue)
 
-    logging.basicConfig(level=logging.DEBUG, format=LOGGING_FORMAT,)
+    logging.basicConfig(level=logging.ERROR, format=LOGGING_FORMAT,)
     log = logging.getLogger(__name__)
-    log.setLevel(logging.DEBUG)
+    log.setLevel(logging.ERROR)
 
     # Create thread that will listen on the other end of the queue, and send the text to the textedit in our application
     # Detects the application is running within debug session, in that case do not redirect stdout to gui

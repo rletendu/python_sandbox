@@ -28,11 +28,16 @@ HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 DEFAULT_PORT = 65432        # P
 
 class ExaComTCP(threading.Thread):
-    def __init__(self, host=HOST, port=DEFAULT_PORT) -> None:
+    def __init__(self, host=HOST, port=DEFAULT_PORT, demo=False) -> None:
         super().__init__()
         self.log = logging.getLogger()
-        self.connected = False
-        self.ready = False
+        self.demo =demo
+        if demo:
+            self.connected = True
+            self.ready = True
+        else:
+            self.connected = False
+            self.ready = False
         self.q = queue.Queue()
         #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,6 +69,8 @@ class ExaComTCP(threading.Thread):
 
     def get(self):
         if self.is_connected:
+            if self.demo:
+                return
             try:
                 data = self.conn.recv(1024)
                 self.log.info("Received {}".format(data))
@@ -80,22 +87,39 @@ class ExaComTCP(threading.Thread):
 
 
 class ExaComSerial(object):
-    def __init__(self, port, baud=115200) -> None:
+    def __init__(self, port, baud=115200, demo=False) -> None:
         super().__init__()
         self.log = logging.getLogger()
+        self.demo = demo
+        self.connected = True #For Serial connection is available right now
+        self.ready = True
+        if self.demo:
+            return
         self.ser = serial.Serial(port, baudrate=baud, timeout=3)
+
+    def is_ready(self):
+        return self.ready
+
+    def is_connected(self):
+        return self.connected
 
     def send(self, data):
         data = "{}\r".format(data)
         self.log.info("Sending {}".format(data))
+        if self.demo:
+            return
         self.ser.write(data.encode())
 
     def get(self):
+        if self.demo:
+            return
         data = self.ser.readline().decode()
         self.log.info("Received {}".format(data))
         return data
 
     def __del__(self):
+        if self.demo:
+            return
         self.ser.close()
 
 class Exa(object):
@@ -107,17 +131,18 @@ class Exa(object):
         self.high_band = accuracy
         self.temperature = 25
         self.ready = False
-        if self.demo:
-            return
+
         if com_port is not None and tcp_port is None:
-            self.ExaCom = ExaComSerial(port=com_port)
+            self.ExaCom = ExaComSerial(port=com_port, demo=demo)
         elif com_port is None and tcp_port is not None:
             local_ip = socket.gethostbyname(socket.gethostname())
-            self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip)
+            self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip, demo=demo)
             self.ExaCom.start()
         else:
             raise "Invalid Exatron Interface"
 
+    def is_connected(self):
+        return self.ExaCom.is_connected()
 
     def wait_ready(self):
         if self.demo:
@@ -149,7 +174,7 @@ class Exa(object):
         self.ExaCom.send("R")
         r = self.ExaCom.get()
         #'INPUT_TRAY,1,ROW,1,COL,1\r'
-        if r =="OK\r":
+        if r =="S\r":
             return True
         else:
             return False
@@ -160,7 +185,7 @@ class Exa(object):
             return True
         self.ExaCom.send("TEST_RESULT,{}".format(bin))
         r = self.ExaCom.get()
-        if r =="OK\r":
+        if r =="H\r":
             return True
         else:
             return False
@@ -172,7 +197,6 @@ class Exa(object):
             shiller = "ROOM"
         elif temp > 25:
             shiller = "HOT"
-
 
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
@@ -191,6 +215,9 @@ class Exa(object):
             self.log.info("Sending EOL")
             return True
         self.ExaCom.send("EOL")
+        if isinstance(self.ExaCom, ExaComTCP):
+            self.log.info("No answer to EOL in TCP/MODE!")
+            return True
         r = self.ExaCom.get()
         if r =="OK\r":
             return True
