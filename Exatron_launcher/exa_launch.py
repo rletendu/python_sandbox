@@ -3,8 +3,8 @@ import argparse
 from PyQt5.QtCore import pyqtSignal, QMimeData, QTimer, Qt
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtCore import QObject, QThread
-from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog, QMessageBox
-from PyQt5.QtGui import QTextCursor
+from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog, QMessageBox, QShortcut
+from PyQt5.QtGui import QTextCursor, QKeySequence
 from PyQt5 import QtWidgets
 from time import sleep
 from queue import Queue
@@ -101,11 +101,17 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.abortButton.clicked.connect(self.abort)
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
+        self.actionSave_As.triggered.connect(self.menuSaveAs)
         self.actiondebug.setCheckable(True)
         self.actiondebug.triggered.connect(self.debug_enable)
+        self.saveSc = QShortcut(QKeySequence('Ctrl+S'), self)
+        self.saveSc.activated.connect(self.menuSave)
+        self.openSc = QShortcut(QKeySequence('Ctrl+O'), self)
+        self.openSc.activated.connect(self.menuOpen)
 
         self.sig_job = None
         self.worker = None
+        self.filename = None
 
         local_ip = socket.gethostbyname(socket.gethostname())
         self.interfaceBox.addItem(local_ip)
@@ -143,26 +149,37 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     @pyqtSlot()
     def menuOpen(self):
         options = configparser.ConfigParser()
-        name = QFileDialog.getOpenFileName(self, "Select Exajob file...")
-        options.read(name)
+        self.filename, s = QFileDialog.getOpenFileName(self, "Select Exajob file...")
+        options.read(self.filename)
         self.partsEdit.setText( options["EXAJOB"]["parts"])
         self.tempEdit.setText( options["EXAJOB"]["temperatures"])
         self.cmdLineEdit.setText( options["EXAJOB"]["cmdline"])
         self.tcpPortBox.setValue(int(options["EXAJOB"]["exatron_tcp_port"]))
         self.interfaceBox.setCurrentText(options["EXAJOB"]["exatron_interface"])
-        self.tempSoakSpinBox.setValue(options["EXAJOB"]["temp_soak_time"])
-        self.tempAccuracySpinBox.setValue(options["EXAJOB"]["temp_accuracy"])
+        self.tempSoakSpinBox.setValue(int(options["EXAJOB"]["temp_soak_time"]))
+        self.tempAccuracySpinBox.setValue(float(options["EXAJOB"]["temp_accuracy"]))
+        self.setWindowTitle(self.filename)
 
     @pyqtSlot()
     def menuSave(self):
+        if self.filename is not None:
+            self.save(self.filename)
+        else:
+            self.menuSaveAs()
+
+    @pyqtSlot()
+    def menuSaveAs(self):
+        self.filename, filter = QFileDialog.getSaveFileName(self, 'Save File')
+        self.save(self.filename)
+
+    def save(self, f):
         options = configparser.ConfigParser()
         options["EXAJOB"] = {'cmdline':self.cmdLineEdit.text(), 'parts':self.partsEdit.text(), 'temperatures':self.tempEdit.text(),
         'exatron_interface' : self.interfaceBox.currentText(), 'exatron_tcp_port':self.tcpPortBox.value(),
-                             'temp_soak_time' : self.tempAccuracySpinBox.value(), 'temp_accuracy': self.tempSoakSpinBox.value()}
-        name, filter = QFileDialog.getSaveFileName(self, 'Save File')
-        with open(name,'w') as optionsFile:
+                             'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value()}
+        with open(f,'w') as optionsFile:
             options.write(optionsFile)
-
+        self.setWindowTitle(self.filename)
 
     def closeEvent(self, event):
         result = QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?", QMessageBox.Yes | QMessageBox.No)

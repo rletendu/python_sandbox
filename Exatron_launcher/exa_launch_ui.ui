@@ -295,6 +295,8 @@
     </property>
     <addaction name="actionopen"/>
     <addaction name="actionsave"/>
+    <addaction name="actionSave_As"/>
+    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuoptions">
     <property name="title">
@@ -312,17 +314,22 @@
   </action>
   <action name="actionopen">
    <property name="text">
-    <string>open</string>
+    <string>Open Ctrl-O</string>
    </property>
   </action>
   <action name="actionsave">
    <property name="text">
-    <string>save</string>
+    <string>Save Ctl-S</string>
    </property>
   </action>
   <action name="actiondebug">
    <property name="text">
     <string>debug</string>
+   </property>
+  </action>
+  <action name="actionSave_As">
+   <property name="text">
+    <string>Save As</string>
    </property>
   </action>
  </widget>
