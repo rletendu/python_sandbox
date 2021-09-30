@@ -92,7 +92,14 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
+        self.options = configparser.ConfigParser()
         self.load_ini_file()
+        self.recentfiles_menu = self.menuFile.addMenu("&Open Recent")
+        self.recentfiles_menu.triggered.connect(self.handle_triggered_recentfile)
+        self.last_file = None
+        if self.options.has_option('EXAJOB','last_file'):
+            self.last_file = self.options['EXAJOB']['last_file']
+            self.add_recent_filename(self.last_file)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
         self.exatron = None
@@ -124,18 +131,45 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.startButton.setEnabled(False)
         self.statusbar.showMessage('Select an Exatron Interface')
 
+    @pyqtSlot(QtWidgets.QAction)
+    def handle_triggered_recentfile(self, action):
+        f = action.text()
+        if os.stat(f).st_size != 0:
+            self.filename = f
+            self.options.read(self.filename)
+            self.options2gui()
+            self.setWindowTitle(self.filename)
+            print("Loaded {}".format(f))
+        else:
+            print("{} does not exist".format(f))
+
+    def add_recent_filename(self, filename):
+        action = QtWidgets.QAction(filename, self)
+        actions = self.recentfiles_menu.actions()
+        before_action = actions[0] if actions else None
+        self.recentfiles_menu.insertAction(before_action, action)
+
     def load_ini_file(self):
-        config = configparser.ConfigParser()
         f = open(GUI_CONFIG_FILE, "a+")
         if os.stat(GUI_CONFIG_FILE).st_size == 0:
             # ini file does not exits, creating
             f.close()
-            config['LAST_SETTINGS'] = {'suite_file': '', 'com_port': ''}
+            self.gui2options()
+            #config['LAST_SETTINGS'] = {'suite_file': '', 'com_port': ''}
             with open(GUI_CONFIG_FILE, "w") as gui_config_file:
-                config.write(gui_config_file)
+                self.options.write(gui_config_file)
+        else:
+            self.options.read(GUI_CONFIG_FILE)
+            self.options2gui()
 
-    def write_ini_fiel(self):
-        pass
+    def write_ini_file(self):
+        self.gui2options()
+        if self.filename:
+            self.options['EXAJOB']['last_file'] =self.filename
+        elif self.last_file:
+            self.options['EXAJOB']['last_file'] = self.last_file
+        with open(GUI_CONFIG_FILE, "w") as gui_config_file:
+            self.options.write(gui_config_file)
 
     @pyqtSlot()
     def debug_enable(self):
@@ -148,50 +182,51 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     @pyqtSlot()
     def menuOpen(self):
-        options = configparser.ConfigParser()
         self.filename, s = QFileDialog.getOpenFileName(self, "Select Exajob file...")
-        options.read(self.filename)
-        self.partsEdit.setText( options["EXAJOB"]["parts"])
-        self.tempEdit.setText( options["EXAJOB"]["temperatures"])
-        self.cmdLineEdit.setText( options["EXAJOB"]["cmdline"])
-        self.tcpPortBox.setValue(int(options["EXAJOB"]["exatron_tcp_port"]))
-        self.interfaceBox.setCurrentText(options["EXAJOB"]["exatron_interface"])
-        self.tempSoakSpinBox.setValue(int(options["EXAJOB"]["temp_soak_time"]))
-        self.tempAccuracySpinBox.setValue(float(options["EXAJOB"]["temp_accuracy"]))
+        self.options.read(self.filename)
+        self.options2gui()
         self.setWindowTitle(self.filename)
-
     @pyqtSlot()
     def menuSave(self):
         if self.filename is not None:
             self.save(self.filename)
         else:
             self.menuSaveAs()
-
     @pyqtSlot()
     def menuSaveAs(self):
         self.filename, filter = QFileDialog.getSaveFileName(self, 'Save File')
         self.save(self.filename)
 
     def save(self, f):
-        options = configparser.ConfigParser()
-        options["EXAJOB"] = {'cmdline':self.cmdLineEdit.text(), 'parts':self.partsEdit.text(), 'temperatures':self.tempEdit.text(),
-        'exatron_interface' : self.interfaceBox.currentText(), 'exatron_tcp_port':self.tcpPortBox.value(),
-                             'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value()}
+        self.gui2options()
         with open(f,'w') as optionsFile:
-            options.write(optionsFile)
+            self.options.write(optionsFile)
         self.setWindowTitle(self.filename)
+
+    def gui2options(self):
+        self.options["EXAJOB"] = {
+            'cmdline':self.cmdLineEdit.text(),
+            'parts':self.partsEdit.text(),
+            'temperatures':self.tempEdit.text(),
+            'exatron_interface' : self.interfaceBox.currentText(),
+            'exatron_tcp_port':self.tcpPortBox.value(),
+            'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value()}
+
+    def options2gui(self):
+        self.partsEdit.setText( self.options["EXAJOB"]["parts"])
+        self.tempEdit.setText( self.options["EXAJOB"]["temperatures"])
+        self.cmdLineEdit.setText( self.options["EXAJOB"]["cmdline"])
+        self.tcpPortBox.setValue(int(self.options["EXAJOB"]["exatron_tcp_port"]))
+        self.interfaceBox.setCurrentText(self.options["EXAJOB"]["exatron_interface"])
+        self.tempSoakSpinBox.setValue(int(self.options["EXAJOB"]["temp_soak_time"]))
+        self.tempAccuracySpinBox.setValue(float(self.options["EXAJOB"]["temp_accuracy"]))
 
     def closeEvent(self, event):
         result = QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?", QMessageBox.Yes | QMessageBox.No)
         event.ignore()
         if result == QMessageBox.Yes:
             event.accept()
-            config = configparser.ConfigParser()
-            config['LAST_SETTINGS'] = {}
-            config['LAST_SETTINGS']['suite_file'] = self.param_file
-            config['LAST_SETTINGS']['com_port'] = self.comboBox_com_list.currentText()
-            with open(GUI_CONFIG_FILE, 'w') as configfile:
-                config.write(configfile)
+            self.write_ini_file()
         event.accept()
 
     @pyqtSlot()
