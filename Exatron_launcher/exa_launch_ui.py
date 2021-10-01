@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_ExaJobLauncher(object):
     def setupUi(self, ExaJobLauncher):
         ExaJobLauncher.setObjectName("ExaJobLauncher")
-        ExaJobLauncher.resize(811, 555)
+        ExaJobLauncher.resize(811, 646)
         ExaJobLauncher.setAcceptDrops(True)
         self.centralwidget = QtWidgets.QWidget(ExaJobLauncher)
         self.centralwidget.setObjectName("centralwidget")

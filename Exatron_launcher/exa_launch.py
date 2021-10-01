@@ -17,6 +17,7 @@ import traceback
 from exa_job_thread import ExaJobSignals,ExaJobThread
 import configparser
 import os
+from progress_ui import Ui_Dialog as Progress
 
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
@@ -28,6 +29,32 @@ def excepthook(exc_type, exc_value, exc_tb):
     print("error message:\n", tb)
     QtWidgets.QApplication.quit()
     # or QtWidgets.QApplication.exit(0)
+
+class Progress_Window(QDialog):
+    cancel = pyqtSignal()
+    def __init__(self, msg, parent=None):
+        QDialog.__init__(self, parent=parent)
+        self.popup = Progress()
+        self.popup.setupUi(self)
+        self.popup.label.setText(msg)
+        self.setWindowFlag(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.loading)
+        self.v = 0
+        self.timer.start(10)
+
+    @pyqtSlot()
+    def on_pushButton_clicked(self):
+        self.timer.stop()
+        self.close()
+        self.cancel.emit()
+
+    def loading(self):
+        self.v += 1
+        if self.v > 100:
+            self.v = 0
+        self.popup.progressBar.setValue(self.v)
 
 
 class StdStreamThreadSignals(QObject):
@@ -130,6 +157,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.abortButton.setEnabled(False)
         self.startButton.setEnabled(False)
         self.statusbar.showMessage('Select an Exatron Interface')
+
+
 
     @pyqtSlot(QtWidgets.QAction)
     def handle_triggered_recentfile(self, action):
@@ -253,7 +282,13 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.suite_thread = QThread()
             self.worker.moveToThread(self.suite_thread)
             self.suite_thread.start()
+            self.p = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
+            self.p.show()
+            self.p.cancel.connect(self.connect_cancelled)
 
+    @pyqtSlot()
+    def connect_cancelled(self):
+        print("Cancelled!!")
 
     @pyqtSlot()
     def start(self):
