@@ -38,14 +38,11 @@ class ExaComTCP(threading.Thread):
         else:
             self.connected = False
             self.ready = False
-        self.q = queue.Queue()
-        #self.server = socket.socket(socket.AF_INET, socket.SOCK_RAW)
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(1)
         self.log.info("TCP Server listening on {}:{}".format(host, port))
-        #(self.conn, self.addr) = self.server.accept()
-        #self.log.info("TCP connection with {}".format(self.addr[0]))
+
 
     def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
@@ -91,10 +88,13 @@ class ExaComSerial(object):
         super().__init__()
         self.log = logging.getLogger()
         self.demo = demo
-        self.connected = True #For Serial connection is available right now
-        self.ready = True
-        if self.demo:
+        if demo:
+            self.connected = True
+            self.ready = True
             return
+        else:
+            self.connected = True #For Serial connection is available right now
+            self.ready = False
         self.ser = serial.Serial(port, baudrate=baud, timeout=3)
 
     def is_ready(self):
@@ -173,7 +173,6 @@ class Exa(object):
             return True
         self.ExaCom.send("R")
         r = self.ExaCom.get()
-        #'INPUT_TRAY,1,ROW,1,COL,1\r'
         if r =="S\r":
             return True
         else:
