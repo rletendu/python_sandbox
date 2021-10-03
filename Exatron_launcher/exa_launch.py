@@ -8,7 +8,7 @@ from PyQt5.QtGui import QTextCursor, QKeySequence
 from PyQt5 import QtWidgets
 from time import sleep
 from queue import Queue
-from exa import Exa
+from exatron import ExaTron
 from exa_launch_ui import Ui_ExaJobLauncher
 import serial
 import serial.tools.list_ports
@@ -263,13 +263,13 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         if self.exatron is None:
             interface = self.interfaceBox.currentText()
             if interface.startswith("COM"):
-                self.exatron = Exa(com_port=interface)
+                self.exatron = ExaTron(com_port=interface)
                 self.statusbar.showMessage('{} Openned'.format(interface))
             elif interface == "demo":
-                self.exatron = Exa(com_port=interface, demo=True)
+                self.exatron = ExaTron(com_port=interface, demo=True)
                 self.statusbar.showMessage('Using Demo Handler')
             else:
-                self.exatron = Exa(tcp_port=self.tcpPortBox.value())
+                self.exatron = ExaTron(tcp_port=self.tcpPortBox.value())
                 self.statusbar.showMessage('Server {} waiting client connection'.format(interface))
             self.timer.start(500)
             self.sig_job = ExaJobSignals()

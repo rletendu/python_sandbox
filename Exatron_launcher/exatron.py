@@ -122,7 +122,7 @@ class ExaComSerial(object):
             return
         self.ser.close()
 
-class Exa(object):
+class ExaTron(object):
     def __init__(self, com_port=None, tcp_port=None, demo=False, accuracy=2.0, soak=4):
         self.log = logging.getLogger()
         self.demo = demo
