@@ -17,7 +17,7 @@ import traceback
 from exa_job_thread import ExaJobSignals,ExaJobThread
 import configparser
 import os
-from progress_ui import Ui_Dialog as Progress
+from progress import Progress_Window
 
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
@@ -28,35 +28,6 @@ def excepthook(exc_type, exc_value, exc_tb):
     print("error catched!:")
     print("error message:\n", tb)
     QtWidgets.QApplication.quit()
-    # or QtWidgets.QApplication.exit(0)
-
-class Progress_Window(QDialog):
-    cancel = pyqtSignal()
-    def __init__(self, msg, parent=None):
-        QDialog.__init__(self, parent=parent)
-        self.popup = Progress()
-        self.popup.setupUi(self)
-        self.popup.label.setText(msg)
-        self.setWindowFlag(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.loading)
-        self.v = 0
-        self.timer.start(10)
-
-    @pyqtSlot()
-    def on_pushButton_clicked(self):
-        self.timer.stop()
-        self.close()
-        self.cancel.emit()
-
-    def loading(self):
-        self.v += 1
-        if self.v > 100:
-            self.v = 0
-        self.popup.progressBar.setValue(self.v)
-
-
 class StdStreamThreadSignals(QObject):
     abort_signal = pyqtSignal()
     go_signal = pyqtSignal()
@@ -73,9 +44,11 @@ class WriteStream(object):
     def __init__(self, queue):
         self.__class__.count += 1
         self.queue = queue
+        self.f = open('log.txt',"a")
 
     def write(self, text):
         self.queue.put(text)
+        self.f.write(text)
 
     def flush(self):
         pass
@@ -83,7 +56,7 @@ class WriteStream(object):
     def __del__(self):
         self.__class__.count -= 1
         if self.__class__.count == 0:
-            pass
+            self.f.close()
 
 
 class StdStreamThread(QObject):
@@ -111,6 +84,9 @@ class StdStreamThread(QObject):
     def abort(self):
         self.run_flag = False
 
+    def __del__(self):
+        self.f.close()
+
 
 class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
@@ -131,8 +107,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.timer.timeout.connect(self.Time)
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
-        self.startButton.clicked.connect(self.start)
-        self.abortButton.clicked.connect(self.abort)
+        self.startButton.clicked.connect(self.startJob)
+        self.abortButton.clicked.connect(self.abortJob)
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
         self.actionSave_As.triggered.connect(self.menuSaveAs)
@@ -291,7 +267,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         print("Cancelled!!")
 
     @pyqtSlot()
-    def start(self):
+    def startJob(self):
         self.abortButton.setEnabled(True)
         self.startButton.setEnabled(False)
 
@@ -312,8 +288,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def notify_progress(self, text, part, temp):
         self.cur_part.setText("Curent Part: {}".format(part))
         self.cur_temp.setText("Curent Temp: {}".format(temp))
-        self.tempProgressBar.setValue(100*((self.temp_list.index(temp)+1)/len(self.temp_list)))
-        self.partProgressBar.setValue(100*((self.part_list.index(part)+1)/len(self.part_list)))
+        self.tempProgressBar.setValue(int(100*((self.temp_list.index(temp)+1)/len(self.temp_list))))
+        self.partProgressBar.setValue(int(100*((self.part_list.index(part)+1)/len(self.part_list))))
         if len(text):
             self.statusbar.showMessage(text)
 
@@ -329,7 +305,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         pass
 
     @pyqtSlot()
-    def abort(self):
+    def abortJob(self):
         if self.worker is not None:
             self.worker.abort()
 

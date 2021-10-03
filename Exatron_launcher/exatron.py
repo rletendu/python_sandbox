@@ -43,7 +43,6 @@ class ExaComTCP(threading.Thread):
         self.server.listen(1)
         self.log.info("TCP Server listening on {}:{}".format(host, port))
 
-
     def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
         self.connected = True
@@ -267,9 +266,9 @@ if __name__ == '__main__':
             print("No COM port specified using {}".format(args.com_port))
             break
     if args.tcp_port is None:
-        exatron = Exa(com_port=args.com_port)
+        exatron = ExaTron(com_port=args.com_port)
     else:
-        exatron = Exa(tcp_port=int(args.tcp_port))
+        exatron = ExaTron(tcp_port=int(args.tcp_port))
 
     exatron.wait_ready()
     for i in range(5):
