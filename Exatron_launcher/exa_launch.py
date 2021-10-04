@@ -21,11 +21,6 @@ from progress import Progress_Window
 from options import OptionsDialog
 from enum import Enum
 
-class ExatronState(Enum):
-    OFF = 1
-    CONNECTED= 2
-    READY = 3
-
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 GUI_CONFIG_FILE = "exa_launch.ini"
 
@@ -37,7 +32,6 @@ def excepthook(exc_type, exc_value, exc_tb):
 class StdStreamThreadSignals(QObject):
     abort_signal = pyqtSignal()
     go_signal = pyqtSignal()
-
 
 class WriteStream(object):
     """
@@ -93,6 +87,12 @@ class StdStreamThread(QObject):
     def __del__(self):
         self.f.close()
 
+class ExatronState(Enum):
+    OFF = 1
+    CONNECTED = 2
+    READY = 3
+    WORKING = 4
+
 
 class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
@@ -115,6 +115,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
         self.exatron = None
+        self.exatronState = ExatronState.OFF
 
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.startJob)
@@ -318,14 +319,19 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     @pyqtSlot()
     def Time(self):
-        if self.exatron.is_connected():
-            self.statusbar.showMessage("Handler client is connected, waiting ready")
-        if self.exatron.is_ready():
-            self.timer.stop()
-            self.statusbar.showMessage("Handler is ready!")
-            self.abortButton.setEnabled(False)
-            self.startButton.setEnabled(True)
-        pass
+        if self.exatronState == ExatronState.OFF:
+            if self.exatron.is_connected():
+                self.exatronState = ExatronState.CONNECTED
+                self.statusbar.showMessage("Handler client is connected, waiting ready")
+        elif self.exatronState == ExatronState.CONNECTED:
+            if self.exatron.is_ready():
+                self.exatronState = ExatronState.READY
+                self.statusbar.showMessage("Handler is ready!")
+                self.abortButton.setEnabled(False)
+                self.startButton.setEnabled(True)    
+        elif self.exatronState == ExatronState.READY:
+            if not self.exatron.is_ready():
+                self.exatronState = ExatronState.CONNECTED    
 
     @pyqtSlot()
     def abortJob(self):

@@ -9,6 +9,7 @@ import serial.tools.list_ports
 import time
 from netifaces import interfaces, ifaddresses, AF_INET
 import queue
+from enum import Enum
 
 
 
@@ -26,6 +27,8 @@ LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(fu
 
 HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 DEFAULT_PORT = 65432        # P
+
+
 
 class ExaComTCP(threading.Thread):
     def __init__(self, host=HOST, port=DEFAULT_PORT, demo=False) -> None:
@@ -46,17 +49,22 @@ class ExaComTCP(threading.Thread):
     def run(self) -> None:
         (self.conn, self.addr) = self.server.accept()
         self.connected = True
-        r = self.get()
-        if r =="H\r":
-            self.ready = True
-        #self.conn.settimeout()
         self.log.info("TCP connection with {}".format(self.addr[0]))
+        while True and self.connected:
+            while self.ready:
+                pass
+            r = self.get()
+            if r =="H\r":
+                self.ready = True
 
     def is_connected(self):
         return self.connected
 
     def is_ready(self):
         return self.ready
+
+    def clear_ready(self):
+        self.ready = False
 
     def send(self, data):
         if self.is_connected:
@@ -80,6 +88,9 @@ class ExaComTCP(threading.Thread):
     def setTimeout(self, timeout):
         if self.is_connected():
             self.conn.settimeout(timeout)
+
+    def close(self):
+        self.is_connected = False
 
     def __del__(self):
         self.conn.close()
@@ -126,6 +137,9 @@ class ExaComSerial(object):
         if self.is_connected():
             self.ser.close()
             self.ser = serial.Serial(self.port, baudrate=self.baud, timeout=timeout)
+
+    def close(self):
+        self.ser.close()
 
     def __del__(self):
         if self.demo:
@@ -226,71 +240,13 @@ class ExaTron(object):
             self.log.info("Sending EOL")
             return True
         self.ExaCom.send("EOL")
-        if isinstance(self.ExaCom, ExaComTCP):
-            self.log.info("No answer to EOL in TCP/MODE!")
-            return True
-        r = self.ExaCom.get()
-        if r =="OK\r":
-            return True
-        else:
-            return False
+
+        self.log.info("No answer to EOL in TCP/MODE!")
+        self.ExaCom.clear_ready()
+        return True
 
     def close(self):
+        self.ExaCom.close()
         self.ExaCom.__del__()
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', action='store_true',
-                        help='Activate Debug mode with verbose execution trace information')
-    parser.add_argument('--demo', action='store_true',
-                        help='Activate Demo mode')
-    parser.add_argument('--com_port', default=None,
-                        help='Serial com port')
-    parser.add_argument('--tcp_port', action=None,
-                        help='TCP IP server port number')
-    args = parser.parse_args()
-
-    logging.basicConfig(level=logging.DEBUG, format=LOGGING_FORMAT,)
-    log = logging.getLogger(__name__)
-
-    if args.debug:
-        log.setLevel(logging.DEBUG)
-        log.info("Starting")
-    else:
-        log.setLevel(logging.CRITICAL)
-
-    print("Machine Local IP:")
-    local_ip = socket.gethostbyname(socket.gethostname())
-    print(local_ip)
-
-#    for ifaceName in interfaces():
-#        addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':'No IP addr'}] )]
-#        print(' '.join(addresses))
-
-    
-    com_list = serial.tools.list_ports.comports()
-    if len(com_list)==0:
-        print("No COM port available on this machine")
-    for com in com_list:
-        log.info(com)
-        if args.com_port is None:
-            args.com_port = com.device
-            print("No COM port specified using {}".format(args.com_port))
-            break
-    if args.tcp_port is None:
-        exatron = ExaTron(com_port=args.com_port)
-    else:
-        exatron = ExaTron(tcp_port=int(args.tcp_port))
-
-    exatron.wait_ready()
-    for i in range(5):
-        exatron.set_temperature(25)
-        time.sleep(1)
-        exatron.load_next_part()
-        print("Dummy testing time for 5s ...")
-        time.sleep(5)
-        exatron.unload_part()
-        time.sleep(1)
-    exatron.end_of_lot()
 
