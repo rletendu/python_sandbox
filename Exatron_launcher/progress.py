@@ -21,6 +21,10 @@ class Progress_Window(QDialog):
         self.v = 0
         self.timer.start(10)
 
+    def setMessage(self,msg):
+        self.popup.label.setText(msg)
+        self.timer.start(10)
+
     @pyqtSlot()
     def on_pushButton_clicked(self):
         self.timer.stop()

@@ -77,6 +77,10 @@ class ExaComTCP(threading.Thread):
         else:
             return ""
 
+    def setTimeout(self, timeout):
+        if self.is_connected():
+            self.conn.settimeout(timeout)
+
     def __del__(self):
         self.conn.close()
         self.server.close()
@@ -87,6 +91,8 @@ class ExaComSerial(object):
         super().__init__()
         self.log = logging.getLogger()
         self.demo = demo
+        self.port = port
+        self.baud = baud
         if demo:
             self.connected = True
             self.ready = True
@@ -116,6 +122,11 @@ class ExaComSerial(object):
         self.log.info("Received {}".format(data))
         return data
 
+    def setTimeout(self, timeout):
+        if self.is_connected():
+            self.ser.close()
+            self.ser = serial.Serial(self.port, baudrate=self.baud, timeout=timeout)
+
     def __del__(self):
         if self.demo:
             return
@@ -143,10 +154,12 @@ class ExaTron(object):
     def is_connected(self):
         return self.ExaCom.is_connected()
 
-    def wait_ready(self):
+    def wait_ready(self, timeout=None):
         if self.demo:
             time.sleep(1)
             return True
+        if timeout is not None:
+            self.Exacom.SetTimeout(timeout)
         r = self.ExaCom.get()
         if r =="H\r":
             self.ready = True
@@ -176,7 +189,7 @@ class ExaTron(object):
             return True
         else:
             return False
-        
+
     def unload_part(self, bin=1):
         self.log.info("Unloading part with bin {}".format(bin))
         if self.demo:

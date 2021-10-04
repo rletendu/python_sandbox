@@ -18,7 +18,13 @@ from exa_job_thread import ExaJobSignals,ExaJobThread
 import configparser
 import os
 from progress import Progress_Window
+from options import OptionsDialog
+from enum import Enum
 
+class ExatronState(Enum):
+    OFF = 1
+    CONNECTED= 2
+    READY = 3
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 GUI_CONFIG_FILE = "exa_launch.ini"
@@ -95,6 +101,9 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
+        self.tempOffset =[]
+        for t in [-40,0,25,85,105,125]:
+            self.tempOffset.append((t,t))
         self.options = configparser.ConfigParser()
         self.load_ini_file()
         self.recentfiles_menu = self.menuFile.addMenu("&Open Recent")
@@ -106,11 +115,13 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
         self.exatron = None
+
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.startJob)
         self.abortButton.clicked.connect(self.abortJob)
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
+        self.actionsettings.triggered.connect(self.menuSettings)
         self.actionSave_As.triggered.connect(self.menuSaveAs)
         self.actiondebug.setCheckable(True)
         self.actiondebug.triggered.connect(self.debug_enable)
@@ -118,6 +129,9 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.saveSc.activated.connect(self.menuSave)
         self.openSc = QShortcut(QKeySequence('Ctrl+O'), self)
         self.openSc.activated.connect(self.menuOpen)
+
+        self.settingsPanel = OptionsDialog(self)
+        self.settingsPanel.popup.pushButtonOk.clicked.connect(self.setttingsOk)
 
         self.sig_job = None
         self.worker = None
@@ -133,8 +147,6 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.abortButton.setEnabled(False)
         self.startButton.setEnabled(False)
         self.statusbar.showMessage('Select an Exatron Interface')
-
-
 
     @pyqtSlot(QtWidgets.QAction)
     def handle_triggered_recentfile(self, action):
@@ -186,6 +198,11 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             logging.getLogger().setLevel(logging.ERROR)
 
     @pyqtSlot()
+    def menuSettings(self):
+        self.settingsPanel.fillOffsetTable(self.tempOffset)
+        self.settingsPanel.show()
+
+    @pyqtSlot()
     def menuOpen(self):
         self.filename, s = QFileDialog.getOpenFileName(self, "Select Exajob file...")
         self.options.read(self.filename)
@@ -215,7 +232,9 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             'temperatures':self.tempEdit.text(),
             'exatron_interface' : self.interfaceBox.currentText(),
             'exatron_tcp_port':self.tcpPortBox.value(),
-            'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value()}
+            'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value(),
+            'offset_list' : str(self.tempOffset),
+        }
 
     def options2gui(self):
         self.partsEdit.setText( self.options["EXAJOB"]["parts"])
@@ -225,6 +244,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.interfaceBox.setCurrentText(self.options["EXAJOB"]["exatron_interface"])
         self.tempSoakSpinBox.setValue(int(self.options["EXAJOB"]["temp_soak_time"]))
         self.tempAccuracySpinBox.setValue(float(self.options["EXAJOB"]["temp_accuracy"]))
+        self.tempOffset = eval(self.options["EXAJOB"]["offset_list"])
 
     def closeEvent(self, event):
         result = QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?", QMessageBox.Yes | QMessageBox.No)
@@ -258,19 +278,25 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.suite_thread = QThread()
             self.worker.moveToThread(self.suite_thread)
             self.suite_thread.start()
-            self.p = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
-            self.p.show()
-            self.p.cancel.connect(self.connect_cancelled)
+            self.progressPanel = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
+            self.progressPanel.show()
+            self.progressPanel.cancel.connect(self.progressCancelled)
 
     @pyqtSlot()
-    def connect_cancelled(self):
+    def progressCancelled(self):
         print("Cancelled!!")
 
     @pyqtSlot()
+    def setttingsOk(self):
+        self.tempOffset = self.settingsPanel.readOffsetTable()
+        self.settingsPanel.close()
+
+    @pyqtSlot()
     def startJob(self):
+        self.progressPanel.setMessage('Waiting Handler Ready')
+        self.progressPanel.show()
         self.abortButton.setEnabled(True)
         self.startButton.setEnabled(False)
-
         self.part_list = self.partsEdit.text().replace(" ","").split(",")
         for i in range(len(self.part_list)):
             self.part_list[i] = int(self.part_list[i])
@@ -278,10 +304,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         for i in range(len(self.temp_list)):
             self.temp_list[i] = int(self.temp_list[i])
         self.cmd = self.cmdLineEdit.text()
-
         print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
-
-
         self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
 
     @pyqtSlot(str, int, int)

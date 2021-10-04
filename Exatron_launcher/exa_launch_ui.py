@@ -164,11 +164,14 @@ class Ui_ExaJobLauncher(object):
         self.actiondebug.setObjectName("actiondebug")
         self.actionSave_As = QtWidgets.QAction(ExaJobLauncher)
         self.actionSave_As.setObjectName("actionSave_As")
+        self.actionsettings = QtWidgets.QAction(ExaJobLauncher)
+        self.actionsettings.setObjectName("actionsettings")
         self.menuFile.addAction(self.actionopen)
         self.menuFile.addAction(self.actionsave)
         self.menuFile.addAction(self.actionSave_As)
         self.menuFile.addSeparator()
         self.menuoptions.addAction(self.actiondebug)
+        self.menuoptions.addAction(self.actionsettings)
         self.menuBar.addAction(self.menuFile.menuAction())
         self.menuBar.addAction(self.menuoptions.menuAction())
 
@@ -198,6 +201,7 @@ class Ui_ExaJobLauncher(object):
         self.actionsave.setText(_translate("ExaJobLauncher", "Save Ctl-S"))
         self.actiondebug.setText(_translate("ExaJobLauncher", "debug"))
         self.actionSave_As.setText(_translate("ExaJobLauncher", "Save As"))
+        self.actionsettings.setText(_translate("ExaJobLauncher", "settings"))
 
 
 if __name__ == "__main__":

@@ -11,12 +11,9 @@ import queue
 import logging
 import sys
 
-
+NB_GET_TEMP_BEFORE_OK = 3
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
-
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -47,35 +44,36 @@ if __name__ == '__main__':
     s.connect((local_ip, args.tcp_port))
 
     try:
-        input("press any key for handler ready:")
-        s.sendall("H\r".encode())
-        temp = 25.0
-        target_temp = temp
-        cnt = 5
-        while(True):
-            input = s.recv(1024).decode()
-            print(input)
-            if input=="GET_TEMP?":
-                cnt +=1
-                if cnt>5:
-                    real_temp=target_temp
-                else:
-                    real_temp=target_temp-10
-                s.sendall("CUR_TEMP,{},\r".format(real_temp).encode())
-            elif input=="R":
-                s.sendall("S\r".format(temp).encode())
-            elif input=="TEST_RESULT,1":
-                s.sendall("H\r".format(temp).encode())
-            elif input=="R":
-                s.sendall("S\r".format(temp).encode())
-            elif input.startswith("SET_TEMP"):
-                t = input.split(",")
-                target_temp = float(t[1])
-                print("Target temp : {}".format(target_temp))
-                cnt = 0
-                s.sendall("OK\r".format(temp).encode())
-            elif input=="EOL":
-                break
+        while True:
+            input("press any key for handler ready:")
+            s.sendall("H\r".encode())
+            temp = 25.0
+            target_temp = temp
+            cnt = NB_GET_TEMP_BEFORE_OK
+            while(True):
+                rx = s.recv(1024).decode()
+                print(rx)
+                if rx=="GET_TEMP?":
+                    cnt +=1
+                    if cnt>=NB_GET_TEMP_BEFORE_OK:
+                        real_temp=target_temp
+                    else:
+                        real_temp=target_temp-10
+                    s.sendall("CUR_TEMP,{}\r".format(real_temp).encode())
+                elif rx=="R":
+                    s.sendall("S\r".format(temp).encode())
+                elif rx=="TEST_RESULT,1":
+                    s.sendall("H\r".format(temp).encode())
+                elif rx=="R":
+                    s.sendall("S\r".format(temp).encode())
+                elif rx.startswith("SET_TEMP"):
+                    t = rx.split(",")
+                    target_temp = float(t[1])
+                    print("Target temp : {}".format(target_temp))
+                    cnt = 0
+                    s.sendall("OK\r".format(temp).encode())
+                elif rx=="EOL":
+                    break
     except KeyboardInterrupt:
         print('Interrupted')
         try:

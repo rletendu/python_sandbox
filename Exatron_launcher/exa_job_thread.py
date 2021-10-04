@@ -1,7 +1,9 @@
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QSemaphore, QProcess
+from PyQt5.QtWidgets import QApplication
 import logging
 import time
 import sys
+from progress import Progress_Window
 
 class ExaJobSignals(QObject):
 	"""
@@ -11,6 +13,7 @@ class ExaJobSignals(QObject):
 	abort_suite = pyqtSignal()
 	pause_suite = pyqtSignal()
 	notify_progress = pyqtSignal(str, int, int)
+
 	all_done = pyqtSignal()
 
 
@@ -35,6 +38,7 @@ class ExaJobThread(QObject):
 		self.cmd = None
 		self.temp_accuracy = temp_accuracy
 		self.temp_soak = temp_soak
+		self.progress = Progress_Window("msg")
 
 	@pyqtSlot(list, list, str)
 	def run(self, temp_list, part_list, cmd):
