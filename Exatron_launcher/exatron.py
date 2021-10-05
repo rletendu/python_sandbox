@@ -11,68 +11,47 @@ from netifaces import interfaces, ifaddresses, AF_INET
 import queue
 from enum import Enum
 
-
-
-LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
-
-"""
-"R"
-"EOL"
-"GET_TEMP?"
-"SET_TEMP,85.0,UPPER_BAND,200,LOWER_BAND,200,HOT,SOAK_TIME,3"
-"SET_TEMP,-40.0,UPPER_BAND,200,LOWER_BAND,200,COLD,SOAK_TIME,4"
-"SET_TEMP,25.0,UPPER_BAND,200,LOWER_BAND,200,ROOM,SOAK_TIME,1"
-"TEST_RESULT,1"
-"""
-
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-DEFAULT_PORT = 65432        # P
-
-
+class ExatronState(Enum):
+    OFFLINE = 1
+    CONNECTED = 2
+    READY = 3
+    WORKING = 4
 
 class ExaComTCP(threading.Thread):
-    def __init__(self, host=HOST, port=DEFAULT_PORT, demo=False) -> None:
+    def __init__(self, host, port, demo=False) -> None:
         super().__init__()
         self.log = logging.getLogger()
         self.demo =demo
-        if demo:
-            self.connected = True
-            self.ready = True
-        else:
-            self.connected = False
-            self.ready = False
+        self.state = ExatronState.OFFLINE
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((host, port))
         self.server.listen(1)
         self.log.info("TCP Server listening on {}:{}".format(host, port))
+        self.alive = True
+        self.eolFlag = False
 
     def run(self) -> None:
-        (self.conn, self.addr) = self.server.accept()
-        self.connected = True
-        self.log.info("TCP connection with {}".format(self.addr[0]))
-        while True and self.connected:
-            while self.ready:
-                pass
-            r = self.get()
-            if r =="H\r":
-                self.ready = True
-
-    def is_connected(self):
-        return self.connected
-
-    def is_ready(self):
-        return self.ready
-
-    def clear_ready(self):
-        self.ready = False
+        while True and self.alive:
+            if self.state == ExatronState.OFFLINE:
+                (self.conn, self.addr) = self.server.accept()
+                self.state = ExatronState.CONNECTED
+                self.log.info("TCP connection with {}".format(self.addr[0]))
+            elif self.state == ExatronState.CONNECTED:
+                r = self.get()
+                if r =="H\r":
+                    self.state = ExatronState.READY
+            elif self.state == ExatronState.READY:
+                if self.eolFlag:
+                    self.eolFlag = False
+                    self.state = ExatronState.CONNECTED
 
     def send(self, data):
-        if self.is_connected:
+        if self.state != ExatronState.OFFLINE:
             self.log.info("Sending {}".format(data))
             self.conn.send(data.encode())
 
     def get(self):
-        if self.is_connected:
+        if self.state != ExatronState.OFFLINE:
             if self.demo:
                 return
             try:
@@ -86,38 +65,45 @@ class ExaComTCP(threading.Thread):
             return ""
 
     def setTimeout(self, timeout):
-        if self.is_connected():
+        if self.state != ExatronState.OFFLINE:
             self.conn.settimeout(timeout)
 
     def close(self):
-        self.is_connected = False
+        self.alive = False
 
     def __del__(self):
         self.conn.close()
         self.server.close()
 
 
-class ExaComSerial(object):
+class ExaComSerial(threading.Thread):
     def __init__(self, port, baud=115200, demo=False) -> None:
         super().__init__()
         self.log = logging.getLogger()
         self.demo = demo
         self.port = port
         self.baud = baud
-        if demo:
-            self.connected = True
-            self.ready = True
-            return
-        else:
-            self.connected = True #For Serial connection is available right now
-            self.ready = False
-        self.ser = serial.Serial(port, baudrate=baud, timeout=3)
+        self.state = ExatronState.OFFLINE
+        if not self.demo:
+            self.ser = serial.Serial(port, baudrate=baud, timeout=3)
+        self.alive = True
+        self.eolFlag = False
 
-    def is_ready(self):
-        return self.ready
-
-    def is_connected(self):
-        return self.connected
+    def run(self) -> None:
+        self.state = ExatronState.CONNECTED
+        while True and self.alive:
+            if self.state == ExatronState.OFFLINE:
+                (self.conn, self.addr) = self.server.accept()
+                self.state = ExatronState.READY
+                self.log.info("TCP connection with {}".format(self.addr[0]))
+            elif self.state == ExatronState.CONNECTED:
+                r = self.get()
+                if r =="H\r":
+                    self.state = ExatronState.READY
+            elif self.state == ExatronState.READY:
+                if self.eolFlag:
+                    self.eolFlag = False
+                    self.state = ExatronState.CONNECTED
 
     def send(self, data):
         data = "{}\r".format(data)
@@ -154,7 +140,6 @@ class ExaTron(object):
         self.low_band = accuracy
         self.high_band = accuracy
         self.temperature = 25
-        self.ready = False
 
         if com_port is not None and tcp_port is None:
             self.ExaCom = ExaComSerial(port=com_port, demo=demo)
@@ -165,25 +150,8 @@ class ExaTron(object):
         else:
             raise "Invalid Exatron Interface"
 
-    def is_connected(self):
-        return self.ExaCom.is_connected()
-
-    def wait_ready(self, timeout=None):
-        if self.demo:
-            time.sleep(1)
-            return True
-        if timeout is not None:
-            self.Exacom.SetTimeout(timeout)
-        r = self.ExaCom.get()
-        if r =="H\r":
-            self.ready = True
-            return True
-        else:
-            self.ready = False
-            return False
-
-    def is_ready(self):
-        return self.ExaCom.is_ready()
+    def get_state(self):
+        return self.ExaCom.state
 
     def get_temperature(self):
         if self.demo:
@@ -240,9 +208,7 @@ class ExaTron(object):
             self.log.info("Sending EOL")
             return True
         self.ExaCom.send("EOL")
-
-        self.log.info("No answer to EOL in TCP/MODE!")
-        self.ExaCom.clear_ready()
+        self.ExaCom.eolFlag = True
         return True
 
     def close(self):

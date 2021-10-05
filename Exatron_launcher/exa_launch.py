@@ -8,7 +8,7 @@ from PyQt5.QtGui import QTextCursor, QKeySequence
 from PyQt5 import QtWidgets
 from time import sleep
 from queue import Queue
-from exatron import ExaTron
+from exatron import ExaTron, ExatronState
 from exa_launch_ui import Ui_ExaJobLauncher
 import serial
 import serial.tools.list_ports
@@ -29,6 +29,7 @@ def excepthook(exc_type, exc_value, exc_tb):
     print("error catched!:")
     print("error message:\n", tb)
     QtWidgets.QApplication.quit()
+
 class StdStreamThreadSignals(QObject):
     abort_signal = pyqtSignal()
     go_signal = pyqtSignal()
@@ -87,15 +88,16 @@ class StdStreamThread(QObject):
     def __del__(self):
         self.f.close()
 
-class ExatronState(Enum):
-    OFF = 1
-    CONNECTED = 2
-    READY = 3
-    WORKING = 4
 
+class testerState(Enum):
+        IDLE = 1
+        HANDLER_CONNECT_INIT = 2
+        WAIT_HANDLER_CONNECT = 3
+        WAIT_NEW_JOB_START = 4
+        WAIT_HANDLER_READY = 5
+        WORKING = 6
 
 class MainWindow(QMainWindow, Ui_ExaJobLauncher):
-
     changed = pyqtSignal(QMimeData)
 
     def __init__(self, parent=None):
@@ -115,8 +117,6 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.Time)
         self.exatron = None
-        self.exatronState = ExatronState.OFF
-
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.startJob)
         self.abortButton.clicked.connect(self.abortJob)
@@ -130,10 +130,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.saveSc.activated.connect(self.menuSave)
         self.openSc = QShortcut(QKeySequence('Ctrl+O'), self)
         self.openSc.activated.connect(self.menuOpen)
-
         self.settingsPanel = OptionsDialog(self)
         self.settingsPanel.popup.pushButtonOk.clicked.connect(self.setttingsOk)
-
         self.sig_job = None
         self.worker = None
         self.filename = None
@@ -148,6 +146,11 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.abortButton.setEnabled(False)
         self.startButton.setEnabled(False)
         self.statusbar.showMessage('Select an Exatron Interface')
+
+        self.progressPanel = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
+        self.progressPanel.cancel.connect(self.progressCancelled)
+        self.state = testerState.IDLE
+        self.flagNewJob = False
 
     @pyqtSlot(QtWidgets.QAction)
     def handle_triggered_recentfile(self, action):
@@ -279,9 +282,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.suite_thread = QThread()
             self.worker.moveToThread(self.suite_thread)
             self.suite_thread.start()
-            self.progressPanel = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
-            self.progressPanel.show()
-            self.progressPanel.cancel.connect(self.progressCancelled)
+            self.state = testerState.HANDLER_CONNECT_INIT
+
 
     @pyqtSlot()
     def progressCancelled(self):
@@ -305,8 +307,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         for i in range(len(self.temp_list)):
             self.temp_list[i] = int(self.temp_list[i])
         self.cmd = self.cmdLineEdit.text()
-        print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
-        self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
+        self.flagNewJob = True
 
     @pyqtSlot(str, int, int)
     def notify_progress(self, text, part, temp):
@@ -319,19 +320,34 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     @pyqtSlot()
     def Time(self):
-        if self.exatronState == ExatronState.OFF:
-            if self.exatron.is_connected():
-                self.exatronState = ExatronState.CONNECTED
-                self.statusbar.showMessage("Handler client is connected, waiting ready")
-        elif self.exatronState == ExatronState.CONNECTED:
-            if self.exatron.is_ready():
-                self.exatronState = ExatronState.READY
-                self.statusbar.showMessage("Handler is ready!")
+        if self.state == testerState.IDLE:
+            pass
+        elif self.state == testerState.HANDLER_CONNECT_INIT:
+            self.progressPanel.setMessage("Waiting Handler connection, operator should start Exatron Application")
+            self.progressPanel.show()
+            self.state = testerState.WAIT_HANDLER_CONNECT
+        elif self.state == testerState.WAIT_HANDLER_CONNECT:
+            if self.exatron.get_state() == ExatronState.CONNECTED:
+                self.progressPanel.close()
+                self.state = testerState.WAIT_NEW_JOB_START
                 self.abortButton.setEnabled(False)
-                self.startButton.setEnabled(True)    
-        elif self.exatronState == ExatronState.READY:
-            if not self.exatron.is_ready():
-                self.exatronState = ExatronState.CONNECTED    
+                self.startButton.setEnabled(True)
+        elif self.state == testerState.WAIT_NEW_JOB_START:
+            if self.flagNewJob:
+                self.progressPanel.setMessage("Waiting Ready from handler, operator should start AUTO mode job")
+                self.progressPanel.show()
+                self.flagNewJob = False
+                self.state = testerState.WAIT_HANDLER_READY
+        elif self.state == testerState.WAIT_HANDLER_READY:
+            if self.exatron.get_state() == ExatronState.READY:
+                self.progressPanel.close()
+                print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
+                self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
+                self.state = testerState.WORKING
+                self.abortButton.setEnabled(True)
+                self.startButton.setEnabled(False)
+        elif self.state == testerState.WORKING:
+            pass
 
     @pyqtSlot()
     def abortJob(self):
@@ -342,6 +358,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def all_done(self):
         self.abortButton.setEnabled(False)
         self.startButton.setEnabled(True)
+        self.state = testerState.WAIT_NEW_JOB_START
 
     @pyqtSlot(str)
     def append_log(self, text):
