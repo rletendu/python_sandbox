@@ -190,19 +190,20 @@ class ExaTron(object):
         else:
             return False
 
-    def set_temperature(self, temp):
-        if temp < 20:
-            shiller = "COLD"
-        elif temp == 25:
-            shiller = "ROOM"
-        elif temp > 25:
-            shiller = "HOT"
+    def set_temperature(self, temp, shiller=None, accuracy=2.0):
+        if shiller is None:
+            if temp < 20:
+                shiller = "COLD"
+            elif temp == 25:
+                shiller = "ROOM"
+            elif temp > 25:
+                shiller = "HOT"
 
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
             self.temperature = temp
             return True
-        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,200,LOWER_BAND,200,{},SOAK_TIME,{}".format(temp,shiller, self.soak))
+        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,{},LOWER_BAND,{},SOAK_TIME,{}".format(temp,shiller, accuracy,accuracy, self.soak))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True

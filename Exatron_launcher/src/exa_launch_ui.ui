@@ -307,6 +307,7 @@
     </property>
     <addaction name="actiondebug"/>
     <addaction name="actionsettings"/>
+    <addaction name="actionmanual_ctrl"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuoptions"/>
@@ -339,6 +340,11 @@
   <action name="actionsettings">
    <property name="text">
     <string>settings</string>
+   </property>
+  </action>
+  <action name="actionmanual_ctrl">
+   <property name="text">
+    <string>manual_ctrl</string>
    </property>
   </action>
  </widget>

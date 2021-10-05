@@ -19,6 +19,7 @@ import configparser
 import os
 from progress import Progress_Window
 from options import OptionsDialog
+from manual_ctrl import ManualCtrlDialog
 from enum import Enum
 from datetime import datetime
 import revision
@@ -127,6 +128,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.actionopen.triggered.connect(self.menuOpen)
         self.actionsave.triggered.connect(self.menuSave)
         self.actionsettings.triggered.connect(self.menuSettings)
+        self.actionmanual_ctrl.triggered.connect(self.menuManualCtrl)
         self.actionSave_As.triggered.connect(self.menuSaveAs)
         self.actiondebug.setCheckable(True)
         self.actiondebug.triggered.connect(self.debug_enable)
@@ -136,6 +138,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.openSc.activated.connect(self.menuOpen)
         self.settingsPanel = OptionsDialog(self)
         self.settingsPanel.popup.pushButtonOk.clicked.connect(self.setttingsOk)
+        self.manualCtrlPanel = ManualCtrlDialog(self.exatron, self)
         self.sig_job = None
         self.worker = None
         self.filename = None
@@ -211,6 +214,12 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         if self.logFolder:
             self.settingsPanel.popup.lineEditLogFilesFolder.setText(self.logFolder)
         self.settingsPanel.show()
+
+    @pyqtSlot()
+    def menuManualCtrl(self):
+        self.manualCtrlPanel.exatron = self.exatron
+        self.manualCtrlPanel.timer.start(500)
+        self.manualCtrlPanel.show()
 
     @pyqtSlot()
     def menuOpen(self):
