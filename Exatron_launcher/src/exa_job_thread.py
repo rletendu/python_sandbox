@@ -5,11 +5,14 @@ import time
 import sys
 from progress import Progress_Window
 
+
+ExaJobThreadSuiteSemaphore = QSemaphore(1)
+
 class ExaJobSignals(QObject):
 	"""
 	User defined signals to connect independent measure Thread to gui
 	"""
-	start_suite = pyqtSignal(list,list,str)
+	start_suite = pyqtSignal(list,list,str, list)
 	abort_suite = pyqtSignal()
 	pause_suite = pyqtSignal()
 	notify_progress = pyqtSignal(str, int, int)
@@ -40,13 +43,14 @@ class ExaJobThread(QObject):
 		self.temp_soak = temp_soak
 		self.progress = Progress_Window("msg")
 
-	@pyqtSlot(list, list, str)
-	def run(self, temp_list, part_list, cmd):
+	@pyqtSlot(list, list, str, list)
+	def run(self, temp_list, part_list, cmd, temp_offset):
 		self.part_list = part_list
 		self.temp_list = temp_list
 		self.cmd = cmd
 		self.abort_request = False
 		self.suspended = False
+		self.temp_offset_list = temp_offset
 		for part in self.part_list:
 			if self.abort_request:
 				break
@@ -59,11 +63,16 @@ class ExaJobThread(QObject):
 			for temperature in self.temp_list:
 				self.sig.notify_progress.emit('', part, temperature)
 				print('Set Working temperature to : {}'.format(temperature))
-				self.exatron.set_temperature(temperature)
+				temp_offset = temperature
+				for t in self.temp_offset_list:
+					if t[0] == temperature:
+						temp_offset = t[1]
+						print("Using {} as offset temperature for {}".format(temp_offset, temperature))
+				self.exatron.set_temperature(temp_offset)
 				while True:
 					t = self.exatron.get_temperature()
-					self.sig.notify_progress.emit('Temperature is {} versus {}'.format(t,temperature), part, temperature)
-					if abs( t - temperature ) < self.temp_accuracy:
+					self.sig.notify_progress.emit('Temperature is {} versus {}'.format(t,temp_offset), part, temperature)
+					if abs( t - temp_offset ) < self.temp_accuracy:
 						break
 					if self.abort_request:
 						break
@@ -96,6 +105,8 @@ class ExaJobThread(QObject):
 		self.sig.notify_progress.emit('End of Lot', part, temperature)
 		self.sig.all_done.emit()
 		print("--- LOT COMPLETE ---")
+		time.sleep(2)
+
 
 	@pyqtSlot(int)
 	def process_finished(self, rcode):
@@ -105,6 +116,7 @@ class ExaJobThread(QObject):
 		d = bytes(self.p.readAllStandardOutput()).decode()
 		print(d)
 		sys.stdout.flush()
+
 
 	@pyqtSlot()
 	def abort(self):

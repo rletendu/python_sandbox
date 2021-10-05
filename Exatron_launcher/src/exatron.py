@@ -37,13 +37,19 @@ class ExaComTCP(threading.Thread):
                 self.state = ExatronState.CONNECTED
                 self.log.info("TCP connection with {}".format(self.addr[0]))
             elif self.state == ExatronState.CONNECTED:
-                r = self.get()
-                if r =="H\r":
-                    self.state = ExatronState.READY
+                self.conn.settimeout(2)
+                try:
+                    r = self.get()
+                    if r =="H\r":
+                        self.state = ExatronState.READY
+                        self.conn.settimeout(3600)
+                except socket.timeout:
+                    pass
             elif self.state == ExatronState.READY:
                 if self.eolFlag:
                     self.eolFlag = False
                     self.state = ExatronState.CONNECTED
+                    self.log.info("EOL Flag received, back to ready detection state")
 
     def send(self, data):
         if self.state != ExatronState.OFFLINE:
@@ -72,6 +78,7 @@ class ExaComTCP(threading.Thread):
         self.alive = False
 
     def __del__(self):
+        self.alive = False
         self.conn.close()
         self.server.close()
 

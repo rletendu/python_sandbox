@@ -20,6 +20,8 @@ import os
 from progress import Progress_Window
 from options import OptionsDialog
 from enum import Enum
+from datetime import datetime
+import revision
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 GUI_CONFIG_FILE = "exa_launch.ini"
@@ -103,9 +105,11 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
+        self.setWindowTitle('ExaJobLauncher V{}.{} built {}'.format(revision.REVISION, revision.BUILD, revision.BUILD_DATE))
         self.tempOffset =[]
         for t in [-40,0,25,85,105,125]:
             self.tempOffset.append((t,t))
+        self.logFolder = os.getcwd()
         self.options = configparser.ConfigParser()
         self.load_ini_file()
         self.recentfiles_menu = self.menuFile.addMenu("&Open Recent")
@@ -115,7 +119,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.last_file = self.options['EXAJOB']['last_file']
             self.add_recent_filename(self.last_file)
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.Time)
+        self.timer.timeout.connect(self.testerTick)
         self.exatron = None
         self.connectButton.clicked.connect(self.connect)
         self.startButton.clicked.connect(self.startJob)
@@ -135,7 +139,6 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.sig_job = None
         self.worker = None
         self.filename = None
-
         local_ip = socket.gethostbyname(socket.gethostname())
         self.interfaceBox.addItem(local_ip)
         com_list = serial.tools.list_ports.comports()
@@ -151,6 +154,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.progressPanel.cancel.connect(self.progressCancelled)
         self.state = testerState.IDLE
         self.flagNewJob = False
+        self.logFile = None
 
     @pyqtSlot(QtWidgets.QAction)
     def handle_triggered_recentfile(self, action):
@@ -204,6 +208,8 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     @pyqtSlot()
     def menuSettings(self):
         self.settingsPanel.fillOffsetTable(self.tempOffset)
+        if self.logFolder:
+            self.settingsPanel.popup.lineEditLogFilesFolder.setText(self.logFolder)
         self.settingsPanel.show()
 
     @pyqtSlot()
@@ -238,6 +244,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             'exatron_tcp_port':self.tcpPortBox.value(),
             'temp_soak_time' : self.tempSoakSpinBox.value(), 'temp_accuracy': self.tempAccuracySpinBox.value(),
             'offset_list' : str(self.tempOffset),
+            'log_file_folder': str(self.logFolder),
         }
 
     def options2gui(self):
@@ -249,6 +256,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         self.tempSoakSpinBox.setValue(int(self.options["EXAJOB"]["temp_soak_time"]))
         self.tempAccuracySpinBox.setValue(float(self.options["EXAJOB"]["temp_accuracy"]))
         self.tempOffset = eval(self.options["EXAJOB"]["offset_list"])
+        self.logFolder = self.options["EXAJOB"]['log_file_folder']
 
     def closeEvent(self, event):
         result = QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?", QMessageBox.Yes | QMessageBox.No)
@@ -256,6 +264,10 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         if result == QMessageBox.Yes:
             event.accept()
             self.write_ini_file()
+        if self.exatron:
+            self.exatron.close()
+        if self.logFile:
+            self.logFile.close()
         event.accept()
 
     @pyqtSlot()
@@ -292,12 +304,11 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     @pyqtSlot()
     def setttingsOk(self):
         self.tempOffset = self.settingsPanel.readOffsetTable()
+        self.logFolder = self.settingsPanel.popup.lineEditLogFilesFolder.text()
         self.settingsPanel.close()
 
     @pyqtSlot()
     def startJob(self):
-        self.progressPanel.setMessage('Waiting Handler Ready')
-        self.progressPanel.show()
         self.abortButton.setEnabled(True)
         self.startButton.setEnabled(False)
         self.part_list = self.partsEdit.text().replace(" ","").split(",")
@@ -307,6 +318,13 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
         for i in range(len(self.temp_list)):
             self.temp_list[i] = int(self.temp_list[i])
         self.cmd = self.cmdLineEdit.text()
+        now = datetime.now()
+        dt_string = now.strftime("%Y%m%d_%H%M%S")
+        filename = "exa_launch_{}.log".format(dt_string)
+        f = os.path.join(self.logFolder, filename)
+        if self.logFile:
+            self.logFile.close()
+        self.logFile =open(f, "a")
         self.flagNewJob = True
 
     @pyqtSlot(str, int, int)
@@ -319,7 +337,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.statusbar.showMessage(text)
 
     @pyqtSlot()
-    def Time(self):
+    def testerTick(self):
         if self.state == testerState.IDLE:
             pass
         elif self.state == testerState.HANDLER_CONNECT_INIT:
@@ -332,6 +350,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
                 self.state = testerState.WAIT_NEW_JOB_START
                 self.abortButton.setEnabled(False)
                 self.startButton.setEnabled(True)
+                self.statusbar.showMessage('Handler connected, start a job')
         elif self.state == testerState.WAIT_NEW_JOB_START:
             if self.flagNewJob:
                 self.progressPanel.setMessage("Waiting Ready from handler, operator should start AUTO mode job")
@@ -342,7 +361,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             if self.exatron.get_state() == ExatronState.READY:
                 self.progressPanel.close()
                 print('Starting Exatron job with parts : {} over temperature {}'.format(self.part_list, self.temp_list))
-                self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd)
+                self.sig_job.start_suite.emit(self.temp_list, self.part_list, self.cmd, self.tempOffset)
                 self.state = testerState.WORKING
                 self.abortButton.setEnabled(True)
                 self.startButton.setEnabled(False)
@@ -353,17 +372,25 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
     def abortJob(self):
         if self.worker is not None:
             self.worker.abort()
+        if self.logFile:
+            self.logFile.close()
 
     @pyqtSlot()
     def all_done(self):
         self.abortButton.setEnabled(False)
         self.startButton.setEnabled(True)
         self.state = testerState.WAIT_NEW_JOB_START
+        if self.logFile:
+            pass
+            self.logFile.flush()
 
     @pyqtSlot(str)
     def append_log(self, text):
         self.logBrowser.moveCursor(QTextCursor.End)
         self.logBrowser.insertPlainText(text)
+        if self.logFile:
+            pass
+            self.logFile.write(text)
 
 
 if __name__ == '__main__':

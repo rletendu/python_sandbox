@@ -90,6 +90,9 @@
       </item>
       <item>
        <widget class="QLineEdit" name="cmdLineEdit">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The command line bench being executed for each part and temperature&lt;/p&gt;&lt;p&gt;{temperature} and {part} will be replaced at run time&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Example:&lt;/p&gt;&lt;p&gt;arb_tester --fixed_temperature={temperature} --part_id=={part}&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
          <string>arb_tester --fixed_temperature={temperature} --part_id=={part}</string>
         </property>

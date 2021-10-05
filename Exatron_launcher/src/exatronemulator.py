@@ -11,7 +11,7 @@ import queue
 import logging
 import sys
 
-NB_GET_TEMP_BEFORE_OK = 3
+NB_GET_TEMP_BEFORE_OK = 1
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 
