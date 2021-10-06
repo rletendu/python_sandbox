@@ -94,7 +94,11 @@ class ExaJobThread(QObject):
 				self.sig.notify_progress.emit("Running {}".format(exec_cmd), part, temperature)
 				print("Starting bench {}".format(exec_cmd))
 				self.p.start(exec_cmd)
-				self.p.waitForFinished(msecs=-1)
+				cmd_complete = False
+				while not cmd_complete:
+					if self.p.waitForFinished(msecs=500):
+						cmd_complete = True
+					QApplication.processEvents()
 				self.log.info("Bench Done")
 			self.exatron.unload_part()
 			if self.abort_request:
