@@ -347,6 +347,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     @pyqtSlot()
     def testerTick(self):
+        self.handlerState.setText(self.exatron.get_state().name)
         if self.state == testerState.IDLE:
             pass
         elif self.state == testerState.HANDLER_CONNECT_INIT:

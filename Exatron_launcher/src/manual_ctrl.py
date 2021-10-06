@@ -19,7 +19,7 @@ class ManualCtrlDialog(QDialog):
 
     @pyqtSlot()
     def timerTick(self):
-        self.popup.labelState.setText(self.exatron.get_state())
+        self.popup.labelState.setText(self.exatron.get_state().name)
         pass
 
     @pyqtSlot()
@@ -55,7 +55,7 @@ class ManualCtrlDialog(QDialog):
     @pyqtSlot()
     def on_pushButtonGetTemp_clicked(self):
         t = self.exatron.get_temperature()
-        self.popup.lcdNumber.value(t)
+        self.popup.lcdNumber.display(t)
         pass
 
 

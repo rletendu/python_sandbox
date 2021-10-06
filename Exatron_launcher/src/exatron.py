@@ -165,7 +165,12 @@ class ExaTron(object):
             return self.temperature
         self.ExaCom.send("GET_TEMP?")
         r = self.ExaCom.get()
-        t = float(r.replace("CUR_TEMP,","").replace("\r",''))
+        try:
+            t = float(r.replace("CUR_TEMP,","").replace("\r",''))
+        except Exception as e:
+            print("Error reading temp: {}".format(e))
+            t= 255
+            pass
         return t
 
     def load_next_part(self):
@@ -190,7 +195,7 @@ class ExaTron(object):
         else:
             return False
 
-    def set_temperature(self, temp, shiller=None, accuracy=2.0):
+    def set_temperature(self, temp, shiller=None, accuracy=None, soak=None):
         if shiller is None:
             if temp < 20:
                 shiller = "COLD"
@@ -198,12 +203,21 @@ class ExaTron(object):
                 shiller = "ROOM"
             elif temp > 25:
                 shiller = "HOT"
+        if accuracy is None:
+            low_band = self.low_band
+            high_band = self.high_band
+        else:
+            low_band = accuracy
+            high_band = accuracy
+        if soak is None:
+            soak = self.soak
+
 
         if self.demo:
             self.log.info("Seting temp {} shiller {}".format(temp,shiller))
             self.temperature = temp
             return True
-        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,{},LOWER_BAND,{},SOAK_TIME,{}".format(temp,shiller, accuracy,accuracy, self.soak))
+        self.ExaCom.send("SET_TEMP,{:.01f},UPPER_BAND,{},LOWER_BAND,{},{},SOAK_TIME,{}".format(temp,high_band,low_band,shiller,soak))
         r = self.ExaCom.get()
         if r =="OK\r":
             return True

@@ -11,7 +11,7 @@ import queue
 import logging
 import sys
 
-NB_GET_TEMP_BEFORE_OK = 1
+NB_GET_TEMP_BEFORE_OK = 2
 
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 
@@ -52,26 +52,36 @@ if __name__ == '__main__':
             cnt = NB_GET_TEMP_BEFORE_OK
             while(True):
                 rx = s.recv(1024).decode()
-                print(rx)
+                print("RX <- {}".format(rx))
                 if rx=="GET_TEMP?":
                     cnt +=1
                     if cnt>=NB_GET_TEMP_BEFORE_OK:
                         real_temp=target_temp
                     else:
                         real_temp=target_temp-10
-                    s.sendall("CUR_TEMP,{}\r".format(real_temp).encode())
+                    ans = "CUR_TEMP,{}\r".format(real_temp).encode()
+                    s.sendall(ans)
+                    print("Tx -> {}".format(ans))
                 elif rx=="R":
-                    s.sendall("S\r".format(temp).encode())
+                    ans = "S\r".format(temp).encode()
+                    s.sendall(ans)
+                    print("Tx -> {}".format(ans))
                 elif rx=="TEST_RESULT,1":
-                    s.sendall("H\r".format(temp).encode())
+                    ans = "H\r".format(temp).encode()
+                    s.sendall(ans)
+                    print("Tx -> {}".format(ans))
                 elif rx=="R":
-                    s.sendall("S\r".format(temp).encode())
+                    ans = "S\r".format(temp).encode()
+                    s.sendall(ans)
+                    print("Tx -> {}".format(ans))
                 elif rx.startswith("SET_TEMP"):
                     t = rx.split(",")
                     target_temp = float(t[1])
                     print("Target temp : {}".format(target_temp))
                     cnt = 0
-                    s.sendall("OK\r".format(temp).encode())
+                    ans = "OK\r".format(temp).encode()
+                    s.sendall(ans)
+                    print("Tx -> {}".format(ans))
                 elif rx=="EOL":
                     break
     except KeyboardInterrupt:
