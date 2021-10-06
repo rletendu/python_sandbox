@@ -27,6 +27,12 @@ import revision
 LOGGING_FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
 GUI_CONFIG_FILE = "exa_launch.ini"
 
+#exceptions from an event handler is not supported in Qt.
+#You must not let any exception whatsoever propagate through Qt code.
+#If that is not possible, in Qt 5 you must at least reimplement
+#QCoreApplication::notify() and catch all exceptions there.
+
+
 def excepthook(exc_type, exc_value, exc_tb):
     tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     print("error catched!:")

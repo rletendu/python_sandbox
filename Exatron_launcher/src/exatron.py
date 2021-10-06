@@ -95,18 +95,21 @@ class ExaComSerial(threading.Thread):
             self.ser = serial.Serial(port, baudrate=baud, timeout=3)
         self.alive = True
         self.eolFlag = False
+        self.cnt = 0
 
     def run(self) -> None:
         self.state = ExatronState.CONNECTED
         while True and self.alive:
             if self.state == ExatronState.OFFLINE:
-                (self.conn, self.addr) = self.server.accept()
                 self.state = ExatronState.READY
-                self.log.info("TCP connection with {}".format(self.addr[0]))
             elif self.state == ExatronState.CONNECTED:
-                r = self.get()
-                if r =="H\r":
+                if self.demo:
+                    time.sleep(5)
                     self.state = ExatronState.READY
+                else:
+                    r = self.get()
+                    if r =="H\r":
+                        self.state = ExatronState.READY
             elif self.state == ExatronState.READY:
                 if self.eolFlag:
                     self.eolFlag = False
@@ -132,6 +135,9 @@ class ExaComSerial(threading.Thread):
             self.ser = serial.Serial(self.port, baudrate=self.baud, timeout=timeout)
 
     def close(self):
+        self.alive = False
+        if self.demo:
+            return
         self.ser.close()
 
     def __del__(self):
@@ -150,6 +156,7 @@ class ExaTron(object):
 
         if com_port is not None and tcp_port is None:
             self.ExaCom = ExaComSerial(port=com_port, demo=demo)
+            self.ExaCom.start()
         elif com_port is None and tcp_port is not None:
             local_ip = socket.gethostbyname(socket.gethostname())
             self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip, demo=demo)

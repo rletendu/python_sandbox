@@ -33,9 +33,7 @@ class ExaJobThread(QObject):
 		self.suspended = False
 		self.demo = demo
 		self.exatron = exatron
-		self.p = QProcess()
-		self.p.finished.connect(self.process_finished)
-		self.p.readyReadStandardOutput.connect(self.handle_stdout)
+
 		self.part_list = None
 		self.temp_list = None
 		self.cmd = None
@@ -93,12 +91,17 @@ class ExaJobThread(QObject):
 				exec_cmd = self.cmd.replace('{temperature}', str(temperature)).replace('{part}',str(part))
 				self.sig.notify_progress.emit("Running {}".format(exec_cmd), part, temperature)
 				print("Starting bench {}".format(exec_cmd))
+				self.p = QProcess()
+				self.p.finished.connect(self.process_finished)
+				self.p.readyReadStandardOutput.connect(self.handle_stdout)
 				self.p.start(exec_cmd)
-				cmd_complete = False
-				while not cmd_complete:
+				self.cmd_complete = False
+				while not self.cmd_complete:
+					pass
 					if self.p.waitForFinished(msecs=500):
-						cmd_complete = True
-					QApplication.processEvents()
+						self.cmd_complete = True
+					self.log.info("Job running..")
+				#	QApplication.processEvents()
 				self.log.info("Bench Done")
 			self.exatron.unload_part()
 			if self.abort_request:
@@ -115,6 +118,7 @@ class ExaJobThread(QObject):
 	@pyqtSlot(int)
 	def process_finished(self, rcode):
 		self.log.info("Process completed with {}".format(rcode))
+		self.cmd_complete = True
 
 	def handle_stdout(self):
 		d = bytes(self.p.readAllStandardOutput()).decode()
