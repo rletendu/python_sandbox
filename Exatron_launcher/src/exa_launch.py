@@ -155,8 +155,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.interfaceBox.addItem(com.device)
             break
         self.interfaceBox.addItem("demo")
-        self.abortButton.setEnabled(False)
-        self.startButton.setEnabled(False)
+
         self.statusbar.showMessage('Select an Exatron Interface')
 
         self.progressPanel = Progress_Window(msg="Waiting Handler Connection", parent=self.window())
@@ -229,7 +228,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
 
     @pyqtSlot()
     def menuOpen(self):
-        self.filename, s = QFileDialog.getOpenFileName(self, "Select Exajob file...")
+        self.filename, s = QFileDialog.getOpenFileName(self, "Select Exajob file...",'', "ExaLaunch Files (*.ejcfg);;All Files (*)")
         self.options.read(self.filename)
         self.options2gui()
         self.setWindowTitle(self.filename)
@@ -241,7 +240,7 @@ class MainWindow(QMainWindow, Ui_ExaJobLauncher):
             self.menuSaveAs()
     @pyqtSlot()
     def menuSaveAs(self):
-        self.filename, filter = QFileDialog.getSaveFileName(self, 'Save File')
+        self.filename, filter = QFileDialog.getSaveFileName(self, 'Save File','', "ExaLaunch Files (*.ejcfg);;All Files (*)")
         self.save(self.filename)
 
     def save(self, f):

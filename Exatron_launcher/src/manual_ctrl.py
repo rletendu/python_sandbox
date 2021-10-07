@@ -3,6 +3,7 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtCore import QObject, QThread
 from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QFileDialog, QMessageBox, QShortcut
 from PyQt5 import QtWidgets
+from exatron import ExatronState
 from manual_ctrl_ui import Ui_Dialog as ManualCtrl
 
 
@@ -16,11 +17,30 @@ class ManualCtrlDialog(QDialog):
         self.exatron = exatron
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.timerTick)
+        if self.exatron is None:
+            self.prevExatronState = ExatronState.OFFLINE
+        else:
+            self.prevExatronState = self.exatron.get_state()
 
     @pyqtSlot()
     def timerTick(self):
-        self.popup.labelState.setText(self.exatron.get_state().name)
-        pass
+        if self.exatron is None:
+            return
+        new_state = self.exatron.get_state()
+        self.popup.labelState.setText(new_state.name)
+        if new_state != self.prevExatronState:
+            if new_state == ExatronState.READY:
+                self.buttonsSetEnable(True)
+            else:
+                self.buttonsSetEnable(False)
+        self.prevExatronState = new_state
+
+    def buttonsSetEnable(self, state):
+        self.popup.pushButtonEol.setEnabled(state)
+        self.popup.pushButtonGetTemp.setEnabled(state)
+        self.popup.pushButtonNextPart.setEnabled(state)
+        self.popup.pushButtonSetTemp.setEnabled(state)
+        self.popup.pushButtonResult.setEnabled(state)
 
     @pyqtSlot()
     def on_pushButtonOk_clicked(self):
