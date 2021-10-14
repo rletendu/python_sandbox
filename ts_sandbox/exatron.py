@@ -48,7 +48,6 @@ class ExaComTCP(threading.Thread):
                 elif self.state == ExatronState.READY:
                     pass
         else :
-
             while self.alive:
                 if self.state == ExatronState.OFFLINE:
                     (self.conn, self.addr) = self.server.accept()
@@ -69,6 +68,9 @@ class ExaComTCP(threading.Thread):
 
     def waitConnected(self):
         if self.demo:
+            time.sleep(2)
+            if not self.asynch:
+                self.state = ExatronState.CONNECTED
             return
         if self.asynch:
             while self.state != ExatronState.CONNECTED:
@@ -81,6 +83,9 @@ class ExaComTCP(threading.Thread):
 
     def waitReady(self, timeout=None):
         if self.demo:
+            time.sleep(2)
+            if not self.asynch:
+                self.state = ExatronState.CONNECTED
             return
         if self.asynch:
             while self.state != ExatronState.READY:
@@ -143,34 +148,52 @@ class ExaComSerial(threading.Thread):
         self.port = port
         self.baud = baud
         self.asynch = asynch
-        if self.asynch:
-            self.state = ExatronState.OFFLINE
+        self.state = ExatronState.OFFLINE
+        self.ser = None
+        if not self.demo:
+            self.ser = serial.Serial(port, baudrate=baud, timeout=None)
+
+        if self.asynch:    
             self.alive = True
         else:
             self.alive = False
-        if not self.demo:
-            self.ser = serial.Serial(port, baudrate=baud, timeout=None)
         self.cnt = 0
 
     def run(self) -> None:
-        while True and self.alive:
-            if self.state == ExatronState.OFFLINE:
-                self.state = ExatronState.READY
-            elif self.state == ExatronState.CONNECTED:
-                if self.demo:
+        if self.demo:
+            while self.alive:
+                if self.state == ExatronState.OFFLINE:
+                    time.sleep(2)
+                    self.state = ExatronState.READY
+                elif self.state == ExatronState.CONNECTED:
                     time.sleep(5)
                     self.state = ExatronState.READY
-                else:
-                    r = self.get()
-                    if r =="H\r":
+                elif self.state == ExatronState.READY:
+                    pass
+        else:
+            while self.alive:
+                if self.state == ExatronState.OFFLINE:
+                    self.state = ExatronState.READY
+                elif self.state == ExatronState.CONNECTED:
+                    if self.demo:
+                        time.sleep(5)
                         self.state = ExatronState.READY
-            elif self.state == ExatronState.READY:
-                pass
+                    else:
+                        r = self.get()
+                        if r =="H\r":
+                            self.state = ExatronState.READY
+                elif self.state == ExatronState.READY:
+                    pass
 
 
     def waitConnected(self):
+        if self.demo:
+            time.sleep(2)
+            if not self.asynch:
+                self.state = ExatronState.CONNECTED
+            return
         if self.asynch:
-            while self.state == ExatronState.CONNECTED:
+            while self.state != ExatronState.CONNECTED:
                 pass
             return True
         else:
@@ -179,6 +202,11 @@ class ExaComSerial(threading.Thread):
             return True
 
     def waitReady(self, timeout=None):
+        if self.demo:
+            time.sleep(2)
+            if not self.asynch:
+                self.state = ExatronState.READY
+            return
         if self.asynch:
             while self.state != ExatronState.READY:
                 pass
@@ -225,7 +253,8 @@ class ExaComSerial(threading.Thread):
     def __del__(self):
         if self.demo:
             return
-        self.ser.close()
+        if self.ser:
+            self.ser.close()
 
 class ExaTron(object):
     def __init__(self, com_port=None, tcp_port=None, demo=False, accuracy=2.0, soak=4, asynch=True):
