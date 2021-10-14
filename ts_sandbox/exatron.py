@@ -33,10 +33,8 @@ class ExaComTCP(threading.Thread):
             self.alive = True
         else:
             self.alive = False
-        self.eolFlag = False
         self.conn = None
         self.addr = None
-
 
     def run(self) -> None:
         if self.demo:
@@ -48,9 +46,7 @@ class ExaComTCP(threading.Thread):
                     time.sleep(5)
                     self.state = ExatronState.READY
                 elif self.state == ExatronState.READY:
-                    if self.eolFlag:
-                        self.eolFlag = False
-                        self.state = ExatronState.CONNECTED
+                    pass
         else :
             while self.alive:
                 if self.state == ExatronState.OFFLINE:
@@ -67,10 +63,7 @@ class ExaComTCP(threading.Thread):
                     except socket.timeout:
                         pass
                 elif self.state == ExatronState.READY:
-                    if self.eolFlag:
-                        self.eolFlag = False
-                        self.state = ExatronState.CONNECTED
-                        self.log.info("EOL Flag received, back to ready detection state")
+                    pass
 
     def waitConnected(self):
         if self.asynch:
@@ -99,12 +92,13 @@ class ExaComTCP(threading.Thread):
                 self.conn.settimeout(3600)
                 return False
 
-    def send(self, data):
+    def send(self, data, eol=False):
         if self.state != ExatronState.OFFLINE:
             self.log.info("Sending {}".format(data))
             self.conn.send(data.encode())
-        if not self.asynch and self.eolFlag:
-            self.state = ExatronState.CONNECTED
+            if eol:
+                self.state = ExatronState.CONNECTED
+
 
     def get(self):
         if self.state != ExatronState.OFFLINE:
@@ -144,10 +138,11 @@ class ExaComSerial(threading.Thread):
         self.asynch = asynch
         if self.asynch:
             self.state = ExatronState.OFFLINE
+            self.alive = True
+        else:
+            self.alive = False
         if not self.demo:
-            self.ser = serial.Serial(port, baudrate=baud, timeout=3)
-        self.alive = True
-        self.eolFlag = False
+            self.ser = serial.Serial(port, baudrate=baud, timeout=None)
         self.cnt = 0
 
     def run(self) -> None:
@@ -164,19 +159,44 @@ class ExaComSerial(threading.Thread):
                     if r =="H\r":
                         self.state = ExatronState.READY
             elif self.state == ExatronState.READY:
-                if self.eolFlag:
-                    self.eolFlag = False
-                    self.state = ExatronState.CONNECTED
+                pass
 
-    def send(self, data):
+
+    def waitConnected(self):
+        if self.asynch:
+            while self.state == ExatronState.CONNECTED:
+                pass
+            return True
+        else:
+            if self.state == ExatronState.OFFLINE:
+                self.state = ExatronState.CONNECTED
+            return True
+
+    def waitReady(self, timeout=None):
+        if self.asynch:
+            while self.state == ExatronState.READY:
+                pass
+            return True
+        else:
+            if timeout:
+                self.setTimeout(timeout)
+            r = self.get()
+            if r == "H\r":
+                self.state = ExatronState.READY
+                self.conn.settimeout(3600)
+                return True
+            else:
+                self.conn.settimeout(3600)
+                return False
+
+    def send(self, data, eol=False):
         data = "{}\r".format(data)
         self.log.info("Sending {}".format(data))
+        if eol:
+            self.state = ExatronState.CONNECTED
         if self.demo:
             return
         self.ser.write(data.encode())
-        if not self.asynch and self.eolFlag:
-            self.state = ExatronState.CONNECTED
-
 
     def get(self):
         if self.demo:
@@ -186,7 +206,7 @@ class ExaComSerial(threading.Thread):
         return data
 
     def setTimeout(self, timeout):
-        if self.is_connected():
+        if self.ser:
             self.ser.close()
             self.ser = serial.Serial(self.port, baudrate=self.baud, timeout=timeout)
 
@@ -308,8 +328,7 @@ class ExaTron(object):
         if self.demo:
             self.log.info("Sending EOL")
             return True
-        self.ExaCom.send("EOL")
-        self.ExaCom.eolFlag = True
+        self.ExaCom.send("EOL",eol=True)
         return True
 
     def close(self):
