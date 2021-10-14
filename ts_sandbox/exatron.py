@@ -1,15 +1,11 @@
 import logging
-import argparse
-import os
-import shutil
 import socket
 import threading
 import serial
 import serial.tools.list_ports
 import time
-from netifaces import interfaces, ifaddresses, AF_INET
-import queue
 from enum import Enum
+import sys
 
 class ExatronState(Enum):
     OFFLINE = 1
@@ -22,21 +18,25 @@ class ExaComTCP(threading.Thread):
         super().__init__()
         self.log = logging.getLogger()
         self.demo = demo
+        self.asynch = asynch
         self.state = ExatronState.OFFLINE
+        self.server = None
+        self.conn = None
+        self.addr = None
         if not self.demo:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server.bind((host, int(port)))
             self.server.listen(1)
             self.log.info("TCP Server listening on {}:{}".format(host, port))
-        self.asynch = asynch
+
         if self.asynch:
             self.alive = True
         else:
             self.alive = False
-        self.conn = None
-        self.addr = None
+
 
     def run(self) -> None:
+        self.alive = True
         if self.demo:
             while self.alive:
                 if self.state == ExatronState.OFFLINE:
@@ -48,11 +48,13 @@ class ExaComTCP(threading.Thread):
                 elif self.state == ExatronState.READY:
                     pass
         else :
+
             while self.alive:
                 if self.state == ExatronState.OFFLINE:
-                    self.waitConnected()
-                    self.state = ExatronState.CONNECTED
-                    self.log.info("TCP connection with {}".format(self.addr[0]))
+                    (self.conn, self.addr) = self.server.accept()
+                    if self.conn:
+                        self.state = ExatronState.CONNECTED
+                        self.log.info("TCP connection with {}".format(self.addr[0]))
                 elif self.state == ExatronState.CONNECTED:
                     self.conn.settimeout(2)
                     try:
@@ -66,8 +68,10 @@ class ExaComTCP(threading.Thread):
                     pass
 
     def waitConnected(self):
+        if self.demo:
+            return
         if self.asynch:
-            while self.state == ExatronState.CONNECTED:
+            while self.state != ExatronState.CONNECTED:
                 pass
             return True
         else:
@@ -76,8 +80,10 @@ class ExaComTCP(threading.Thread):
                 self.state = ExatronState.CONNECTED
 
     def waitReady(self, timeout=None):
+        if self.demo:
+            return
         if self.asynch:
-            while self.state == ExatronState.READY:
+            while self.state != ExatronState.READY:
                 pass
             return True
         else:
@@ -125,7 +131,8 @@ class ExaComTCP(threading.Thread):
         self.alive = False
         if self.conn:
             self.conn.close()
-        self.server.close()
+        if self.server:
+            self.server.close()
 
 
 class ExaComSerial(threading.Thread):
@@ -146,7 +153,6 @@ class ExaComSerial(threading.Thread):
         self.cnt = 0
 
     def run(self) -> None:
-        self.state = ExatronState.CONNECTED
         while True and self.alive:
             if self.state == ExatronState.OFFLINE:
                 self.state = ExatronState.READY
@@ -174,7 +180,7 @@ class ExaComSerial(threading.Thread):
 
     def waitReady(self, timeout=None):
         if self.asynch:
-            while self.state == ExatronState.READY:
+            while self.state != ExatronState.READY:
                 pass
             return True
         else:
@@ -242,7 +248,7 @@ class ExaTron(object):
         elif com_port is None and tcp_port is not None:
             local_ip = socket.gethostbyname(socket.gethostname())
 
-            print(local_ip)
+            self.log.info('Local Ip : {}'.format(local_ip))
             self.ExaCom = ExaComTCP(port=tcp_port,host=local_ip, demo=demo, asynch=asynch)
             if asynch:
                 self.ExaCom.start()
@@ -336,6 +342,33 @@ class ExaTron(object):
         self.ExaCom.__del__()
 
 if __name__ == '__main__':
-    exatron = ExaTron(com_port=False, tcp_port=4000, demo=True, accuracy=3, soak=10)
-    time.sleep(10)
-    exatron.close()
+    def exa_tester(exatron):
+        print("Waiting Handler connection ....")
+        exatron.waitConnected()
+        print("Connected")
+        for j in range(2):
+            print("Waiting Handler ready ....")
+            exatron.waitReady()
+            print("Ready")
+            for i in range(10):
+                print("Loading part ....")
+                exatron.load_next_part()
+                for temp in (85,25,125):
+                    print("Setting temp : {}".format(temp))
+                    exatron.set_temperature(temp)
+                print("Unloading part ...")
+                exatron.unload_part(1)
+            print("End of Lot ...")
+            exatron.end_of_lot()
+        print("All Done")
+        exatron.close()
+
+    debug_level = logging.DEBUG
+    FORMAT = '%(asctime)s :: %(levelname)s :: %(name)s :: %(lineno)d :: %(funcName)s :: %(message)s'
+    logging.basicConfig(level=debug_level, format=FORMAT, stream=sys.stderr)
+    log = logging.getLogger(__name__)
+    exatron = ExaTron(com_port=False, tcp_port=4000, demo=False, accuracy=3, soak=10, asynch=False)
+    exa_tester(exatron)
+    exatron = ExaTron(com_port=False, tcp_port=4000, demo=True, accuracy=3, soak=10, asynch=False)
+    exa_tester(exatron)
+
