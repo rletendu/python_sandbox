@@ -58,11 +58,14 @@ class ExaComTCP(threading.Thread):
                     pass
 
     def waitConnected(self):
-        if self.demo:
-            time.sleep(2)
+        if self.demo:      
             if not self.asynch:
                 self.state = ExatronState.CONNECTED
-            return
+                time.sleep(2)
+            else:
+                while self.state != ExatronState.CONNECTED:
+                    pass
+            return True
         if self.asynch:
             while self.state != ExatronState.CONNECTED:
                 pass
@@ -74,25 +77,28 @@ class ExaComTCP(threading.Thread):
 
     def waitReady(self, timeout=None):
         if self.demo:
-            time.sleep(2)
-            if not self.asynch:
-                self.state = ExatronState.CONNECTED
-            return
+            if self.asynch:
+                while self.state != ExatronState.READY:
+                    pass
+            else:
+                time.sleep(2)
+                self.state = ExatronState.READY
+            return True
         if self.asynch:
             while self.state != ExatronState.READY:
                 pass
             return True
+            
+        if timeout:
+            self.conn.settimeout(timeout)
+        r = self.get()
+        if r == "H\r":
+            self.state = ExatronState.READY
+            self.conn.settimeout(3600)
+            return True
         else:
-            if timeout:
-                self.conn.settimeout(timeout)
-            r = self.get()
-            if r == "H\r":
-                self.state = ExatronState.READY
-                self.conn.settimeout(3600)
-                return True
-            else:
-                self.conn.settimeout(3600)
-                return False
+            self.conn.settimeout(3600)
+            return False
 
     def send(self, data, eol=False):
         if self.state != ExatronState.OFFLINE:
@@ -100,7 +106,6 @@ class ExaComTCP(threading.Thread):
             self.conn.send(data.encode())
             if eol:
                 self.state = ExatronState.CONNECTED
-
 
     def get(self):
         if self.state != ExatronState.OFFLINE:

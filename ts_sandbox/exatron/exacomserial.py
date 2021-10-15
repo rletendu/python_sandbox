@@ -17,12 +17,10 @@ class ExaComSerial(threading.Thread):
         self.ser = None
         if not self.demo:
             self.ser = serial.Serial(port, baudrate=baud, timeout=None)
-
         if self.asynch:    
             self.alive = True
         else:
             self.alive = False
-        self.cnt = 0
 
     def run(self) -> None:
         if self.demo:
@@ -52,41 +50,47 @@ class ExaComSerial(threading.Thread):
 
 
     def waitConnected(self):
-        if self.demo:
-            time.sleep(2)
+        if self.demo:      
             if not self.asynch:
                 self.state = ExatronState.CONNECTED
-            return
+                time.sleep(2)
+            else:
+                while self.state != ExatronState.CONNECTED:
+                    pass
+            return True
         if self.asynch:
             while self.state != ExatronState.CONNECTED:
                 pass
             return True
-        else:
-            if self.state == ExatronState.OFFLINE:
-                self.state = ExatronState.CONNECTED
-            return True
+        if self.state == ExatronState.OFFLINE:
+            self.state = ExatronState.CONNECTED
+        return True
 
     def waitReady(self, timeout=None):
         if self.demo:
-            time.sleep(2)
-            if not self.asynch:
+            if self.asynch:
+                while self.state != ExatronState.READY:
+                    pass
+            else:
+                time.sleep(2)
                 self.state = ExatronState.READY
-            return
+            return True
+
         if self.asynch:
             while self.state != ExatronState.READY:
                 pass
             return True
+             
+        if timeout:
+            self.setTimeout(timeout)
+        r = self.get()
+        if r == "H\r":
+            self.state = ExatronState.READY
+            self.conn.settimeout(3600)
+            return True
         else:
-            if timeout:
-                self.setTimeout(timeout)
-            r = self.get()
-            if r == "H\r":
-                self.state = ExatronState.READY
-                self.conn.settimeout(3600)
-                return True
-            else:
-                self.conn.settimeout(3600)
-                return False
+            self.conn.settimeout(3600)
+            return False
 
     def send(self, data, eol=False):
         data = "{}\r".format(data)
