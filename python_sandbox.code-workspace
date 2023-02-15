@@ -2,7 +2,38 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"name": "LilyGo-LoRa-Series",
+			"path": "..\\..\\..\\..\\_perso\\lora\\LilyGo-LoRa-Series"
+		},
+		{
+			"name": "lora1",
+			"path": "..\\..\\Documents\\PlatformIO\\Projects\\lora1"
+		},
+		{
+			"name": "sampl_garmin",
+			"path": "..\\..\\OneDrive - Microchip Technology, Inc\\Desktop\\garmin\\sampl_garmin"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"deque": "cpp",
+			"forward_list": "cpp",
+			"initializer_list": "cpp",
+			"list": "cpp",
+			"vector": "cpp",
+			"xhash": "cpp",
+			"xstring": "cpp",
+			"xtree": "cpp",
+			"xutility": "cpp",
+			"chrono": "cpp",
+			"format": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"string_view": "cpp"
+		}
+	}
 }
